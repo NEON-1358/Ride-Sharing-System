@@ -1,0 +1,100 @@
+[
+  {
+    "id": "6d5a6892-419b-4097-a893-2678fcc4b1b4",
+    "rideId": "7f120fa8-135b-4f36-aead-6c9b7335d622",
+    "riderId": "ff5baf4d-38da-4779-b06a-1b478e662823",
+    "driverId": "d51a2daa-7f4f-47bc-aec3-cbed80c73d57",
+    "status": "pending"
+  },
+  {
+    "id": "c03262fc-5039-4298-bcc7-af6d583737c0",
+    "rideId": "7f120fa8-135b-4f36-aead-6c9b7335d622",
+    "riderId": "9dbf4c41-ccfc-4d53-9c79-de621e1edc83",
+    "driverId": "d51a2daa-7f4f-47bc-aec3-cbed80c73d57",
+    "status": "accepted"
+  },
+  {
+    "id": "cb570e22-5efb-43bf-955d-61445aec761d",
+    "rideId": "29ec5572-2495-4b87-abee-ecb2df6d6b50",
+    "riderId": "9dbf4c41-ccfc-4d53-9c79-de621e1edc83",
+    "driverId": "5cb9f119-fe3a-438b-855c-fe806000ae5f",
+    "status": "accepted"
+  },
+  {
+    "id": "5fb79c0a-1614-4daa-8056-385d3bc09d3e",
+    "rideId": "7f120fa8-135b-4f36-aead-6c9b7335d622",
+    "riderId": "06f9ea92-7946-4e36-bbd1-0fbf56999624",
+    "driverId": "d51a2daa-7f4f-47bc-aec3-cbed80c73d57",
+    "status": "pending"
+  },
+  {
+    "id": "0aa745b6-b47c-43bf-8024-6124ec15f9db",
+    "rideId": "7f120fa8-135b-4f36-aead-6c9b7335d622",
+    "riderId": "f00b5791-1f5c-41ce-b500-b1a5408490d0",
+    "driverId": "d51a2daa-7f4f-47bc-aec3-cbed80c73d57",
+    "status": "pending"
+  },
+  {
+    "id": "ba73b9e9-2c64-4a73-85cc-4d999630eac5",
+    "rideId": "29ec5572-2495-4b87-abee-ecb2df6d6b50",
+    "riderId": "f00b5791-1f5c-41ce-b500-b1a5408490d0",
+    "driverId": "5cb9f119-fe3a-438b-855c-fe806000ae5f",
+    "status": "cancelled"
+  },
+  {
+    "id": "60666f29-7ec8-42ee-a595-0452e4f89afb",
+    "rideId": "66d566a2-09f0-47d8-ba77-ec9c565ce2e8",
+    "riderId": "f00b5791-1f5c-41ce-b500-b1a5408490d0",
+    "driverId": "06f9ea92-7946-4e36-bbd1-0fbf56999624",
+    "status": "cancelled"
+  },
+  {
+    "id": "79e7143b-b634-4178-9111-8fdd305c6ca6",
+    "rideId": "f15a1448-3217-4f5c-84d6-a98e96aa9054",
+    "riderId": "59e47dd4-a82c-4dfa-b7ff-c3e14f6205c0",
+    "driverId": "06f9ea92-7946-4e36-bbd1-0fbf56999624",
+    "status": "accepted"
+  },
+  {
+    "id": "51628e42-d28d-4a48-be8a-108e170ce928",
+    "rideId": "0023c455-bcc7-4e24-9a02-3ef5c97469f2",
+    "riderId": "f00b5791-1f5c-41ce-b500-b1a5408490d0",
+    "driverId": "06f9ea92-7946-4e36-bbd1-0fbf56999624",
+    "status": "cancelled"
+  },
+  {
+    "id": "5dec9f14-3a1a-4746-ad3e-fd06d4481c65",
+    "rideId": "29ec5572-2495-4b87-abee-ecb2df6d6b50",
+    "riderId": "59e47dd4-a82c-4dfa-b7ff-c3e14f6205c0",
+    "driverId": "5cb9f119-fe3a-438b-855c-fe806000ae5f",
+    "status": "cancelled"
+  },
+  {
+    "id": "f198c884-5109-473b-bea2-17d4ca4cdd05",
+    "rideId": "0b5c4140-de7b-4269-b1fc-d05e9cc2828d",
+    "riderId": "59e47dd4-a82c-4dfa-b7ff-c3e14f6205c0",
+    "driverId": "06f9ea92-7946-4e36-bbd1-0fbf56999624",
+    "status": "accepted"
+  },
+  {
+    "id": "4e1e684b-7645-45d7-99ce-d0d4c4376e56",
+    "rideId": "0b5c4140-de7b-4269-b1fc-d05e9cc2828d",
+    "riderId": "f53613cb-5d94-41d1-b63d-7787412fd50c",
+    "driverId": "06f9ea92-7946-4e36-bbd1-0fbf56999624",
+    "status": "accepted"
+  },
+  {
+    "id": "79d2e900-7448-4aaf-9acc-48ef12a74cfb",
+    "rideId": "c9ac7b5a-dd69-407e-8141-127bad77c6e7",
+    "riderId": "1fa0282b-5b12-461b-9061-596b7611519d",
+    "driverId": "06f9ea92-7946-4e36-bbd1-0fbf56999624",
+    "status": "cancelled"
+  },
+  {
+    "id": "4c8e0d27-bfd5-4495-afbd-2ad6db2f1a3d",
+    "rideId": "29ec5572-2495-4b87-abee-ecb2df6d6b50",
+    "riderId": "1fa0282b-5b12-461b-9061-596b7611519d",
+    "driverId": "5cb9f119-fe3a-438b-855c-fe806000ae5f",
+    "status": "cancelled"
+  }
+]

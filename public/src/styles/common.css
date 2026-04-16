@@ -1,0 +1,24 @@
+/* common.css - shared styles for all pages */
+
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Roboto', Arial, sans-serif; line-height: 1.6; color: #333; background: linear-gradient(to bottom right, #f6f8fb 0%, #ffffff 100%); }
+:root { --bg: #f6f8fb; --primary: #0066FF; --primary-dark: #0050cc; --accent: #00bfa6; --muted: #6b7280; --card-bg: #ffffff; --text: #0f1724; }
+.container { width: 90%; max-width: 1000px; margin: 0 auto; }
+header { background: linear-gradient(90deg,var(--primary),var(--primary-dark)); color: #fff; padding: 1rem 0; box-shadow: 0 4px 18px rgba(6,34,68,0.12); }
+header .logo { display: inline-block; font-size: 1.5rem; font-weight: bold; }
+header nav { display: inline-block; float: right; }
+header nav a { color: #fff; text-decoration: none; margin-left: 1rem; font-weight: 500; padding: 0.4rem 0.8rem; border-radius: 6px; transition: background 0.2s, transform 0.12s; }
+header nav a:hover { background: rgba(255,255,255,0.2); text-decoration: underline; }
+footer { background: #222; color: #ccc; padding: 1rem 0; text-align: center; margin-top: 2rem; font-size: 0.9rem; }
+.btn { display: inline-block; background: var(--primary); color: #fff; padding: 0.65rem 1.25rem; text-decoration: none; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: background 0.18s ease, transform 0.12s ease, box-shadow 0.12s ease; box-shadow: 0 6px 14px rgba(6,34,68,0.06); }
+.btn.small { padding: 0.35rem 0.6rem; font-size: 0.85rem; }
+.btn:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 10px 20px rgba(6,34,68,0.08); }
+.form-page { padding: 2rem 0; background: #f8faff; }
+.form { background: var(--card-bg); padding: 1.25rem; border-radius: 12px; box-shadow: 0 6px 20px rgba(17,24,39,0.06); }
+.form h2 { margin-bottom: 1rem; text-align: center; }
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; margin-bottom: 0.5rem; }
+.form-group input, .form-group textarea { width: 100%; padding: 0.6rem; border: 1px solid #e6e9ef; border-radius: 8px; background: #fff; }
+@media (max-width: 600px) { header nav { float: none; text-align: center; margin-top: 0.5rem; } header nav a { display: block; margin: 0.5rem 0; } }

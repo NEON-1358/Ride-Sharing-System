@@ -1,0 +1,44 @@
+/* Styles specific to the home page */
+.hero {
+    text-align: center;
+    padding: 4rem 0;
+    background: linear-gradient(to bottom right, rgba(0,120,212,0.8), rgba(0,90,158,0.8)),
+        url('https://source.unsplash.com/1600x900/?taxi,car') center/cover no-repeat;
+    color: #fff;
+}
+
+.hero h2 { font-size: 2.5rem; margin-bottom: 1rem; animation: fadeIn 1s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+.hero p { font-size: 1.25rem; margin-bottom: 2rem; max-width: 600px; margin-left: auto; margin-right: auto; }
+.hero .buttons .btn { margin: 0 0.5rem; }
+
+.ride-app { display: flex; gap: 2rem; margin-top: 2rem; align-items: flex-start; }
+.ride-left { flex: 1 1 65%; }
+.ride-right { width: 340px; }
+.search-bar { margin-bottom: 1rem; }
+.search-bar input { width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #e6e9ef; }
+.filters .filter-row { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; }
+.filters .filter-row input { padding: 0.45rem 0.5rem; border-radius: 8px; border: 1px solid #e6e9ef; background: #fff; }
+.filters .filter-row .btn.small { margin-left: auto; }
+.rides-list .ride-card, .card.create-ride .ride-card { background: var(--card-bg); padding: 1rem; margin-bottom: 1rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(15,23,42,0.04); }
+.ride-card .ride-route { font-size: 1.1rem; margin-bottom: 0.5rem; }
+.ride-card .ride-meta { color: #666; font-size: 0.95rem; margin-bottom: 0.5rem; }
+.ride-card .ride-driver { font-size: 0.95rem; margin-bottom: 0.5rem; }
+.ride-card .ride-actions { margin-top: 0.5rem; }
+.ride-card.small { padding: 0.6rem; }
+.owner-label, .booked-label, .full-label { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 3px; font-size: 0.9rem; }
+.owner-label { background: #e6f4ff; color: #005a9e; }
+.booked-label { background: #eafaf1; color: #0a7a3f; }
+.full-label { background: #fff0f0; color: #a12; }
+
+#rideModal.modal { display: none; position: fixed; inset: 0; background: rgba(3,7,18,0.45); z-index: 9999; }
+#rideModal.modal[aria-hidden="false"] { display: block; }
+#rideModal .modal-inner { width: 680px; max-width: 95%; margin: 6vh auto; background: var(--card-bg); padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 20px 60px rgba(2,6,23,0.3); position: relative; }
+#rideModal .modal-close { position: absolute; right: 12px; top: 8px; background: transparent; border: none; font-size: 1.6rem; color: var(--muted); cursor: pointer; }
+#rideModal .modal-content { color: var(--text); }
+#rideModal .modal-body { margin-top: 0.75rem; }
+#rideModal .modal-actions { margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: flex-end; }
+
+.ride-card.small { padding: 0.6rem; border-radius: 8px; }
+.card { background: #fff; padding: 1rem; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 1rem; }
+@media (max-width: 900px) { .ride-app { flex-direction: column; } .ride-right { width: 100%; } }
