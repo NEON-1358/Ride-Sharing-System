@@ -3,6 +3,10 @@ const { v4: uuidv4 } = require("uuid");
 
 const ReviewSchema = new mongoose.Schema(
   {
+    _id: {
+      type: String,
+      default: uuidv4,
+    },
     publicId: {
       type: String,
       default: uuidv4,
@@ -10,19 +14,19 @@ const ReviewSchema = new mongoose.Schema(
       index: true,
     },
     ride: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: String,
       ref: "Ride",
       required: true,
       index: true,
     },
     reviewer: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: String,
       ref: "User",
       required: true,
       index: true,
     },
     reviewee: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: String,
       ref: "User",
       required: true,
       index: true,

@@ -70,7 +70,7 @@ exports.signup = async (req, res) => {
       name: value.name.trim(),
       email: value.email.toLowerCase().trim(),
       passwordHash,
-      profilePictureUrl: req.file?.path || "",
+      profilePictureUrl: req.file ? (req.file.path || req.file.filename) : "",
     });
 
     return res.status(201).json(authResponse(user));
@@ -83,10 +83,22 @@ exports.login = async (req, res) => {
   return res.json(authResponse(req.user));
 };
 
-exports.googleCallback = async (req, res) => {
-  const token = issueToken(req.user);
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-  return res.redirect(`${frontendUrl}/oauth/callback?token=${encodeURIComponent(token)}`);
+exports.googleCallback = async (req, res, next) => {
+  const state = req.query.state || "login";
+  const redirectPath = state === "signup" ? "/signup" : "/login";
+
+  try {
+    if (!req.user) {
+      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+      return res.redirect(`${frontendUrl}${redirectPath}?error=no_user_from_google`);
+    }
+    const token = issueToken(req.user);
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    return res.redirect(`${frontendUrl}/oauth/callback?token=${encodeURIComponent(token)}`);
+  } catch (err) {
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    return res.redirect(`${frontendUrl}${redirectPath}?error=google_callback_failed`);
+  }
 };
 
 exports.getMe = async (req, res) => {
@@ -116,17 +128,28 @@ exports.updateProfile = async (req, res) => {
   }
 
   try {
+    const update = {};
     if (value.name) {
-      req.user.name = value.name.trim();
+      update.name = value.name.trim();
     }
-    if (req.file?.path) {
-      req.user.profilePictureUrl = req.file.path;
+    if (req.file) {
+      update.profilePictureUrl = req.file.path || req.file.filename;
     }
-    await req.user.save();
 
-    const payload = await profilePayload(req.user.publicId);
+    const user = await User.findOneAndUpdate(
+      { publicId: req.user.publicId },
+      { $set: update },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const payload = await profilePayload(user.publicId);
     return res.json(payload);
-  } catch (_error) {
-    return res.status(500).json({ message: "Unable to update your profile right now." });
+  } catch (error) {
+    console.error("updateProfile error:", error);
+    return res.status(500).json({ message: "Unable to update your profile right now.", error: error.message });
   }
 };

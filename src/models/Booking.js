@@ -3,6 +3,10 @@ const { v4: uuidv4 } = require("uuid");
 
 const BookingSchema = new mongoose.Schema(
   {
+    _id: {
+      type: String,
+      default: uuidv4,
+    },
     publicId: {
       type: String,
       default: uuidv4,
@@ -10,13 +14,13 @@ const BookingSchema = new mongoose.Schema(
       index: true,
     },
     ride: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: String,
       ref: "Ride",
       required: true,
       index: true,
     },
     user: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: String,
       ref: "User",
       required: true,
       index: true,

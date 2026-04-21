@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { googleAuthUrl } from "../utils/api";
+import { getGoogleAuthUrl } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
@@ -43,7 +43,7 @@ export default function Login() {
           <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
         </label>
         <button type="submit" className="solid-button" disabled={loading}>{loading ? "Signing in..." : "Login"}</button>
-        <a className="google-button" href={googleAuthUrl}>Continue with Google</a>
+        <a className="google-button" href={getGoogleAuthUrl("login")}>Continue with Google</a>
         <p className="muted-text">New here? <Link to="/signup">Create an account</Link></p>
       </form>
     </div>

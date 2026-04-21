@@ -13,10 +13,22 @@ router.post(
   authController.login
 );
 
-router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+router.get("/google", (req, res, next) => {
+  const { from } = req.query;
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    session: false,
+    state: from || "login",
+  })(req, res, next);
+});
+
 router.get(
   "/google/callback",
-  passport.authenticate("google", { failureRedirect: `${process.env.FRONTEND_URL || "http://localhost:5173"}/login?error=google_auth_failed` }),
+  (req, res, next) => {
+    const state = req.query.state || "login";
+    const failureRedirect = `${process.env.FRONTEND_URL || "http://localhost:5173"}/${state === "signup" ? "signup" : "login"}?error=google_auth_failed`;
+    passport.authenticate("google", { failureRedirect, session: false })(req, res, next);
+  },
   authController.googleCallback
 );
 

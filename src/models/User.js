@@ -3,6 +3,10 @@ const { v4: uuidv4 } = require("uuid");
 
 const UserSchema = new mongoose.Schema(
   {
+    _id: {
+      type: mongoose.Schema.Types.Mixed,
+      default: uuidv4,
+    },
     publicId: {
       type: String,
       default: uuidv4,
@@ -60,8 +64,37 @@ const UserSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Compatibility fields for existing data
+    role: {
+      type: String,
+      default: "Client",
+    },
+    password: {
+      type: String,
+      default: null,
+    },
+    profilePic: {
+      type: String,
+      default: "",
+    },
+    chattiness: {
+      type: String,
+      default: "BlaBla",
+    },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    phoneVerified: {
+      type: Boolean,
+      default: false,
+    },
+    govIdVerified: {
+      type: Boolean,
+      default: false,
+    },
   },
-  { timestamps: true }
+  { timestamps: true, strict: false }
 );
 
 module.exports = mongoose.model("User", UserSchema);

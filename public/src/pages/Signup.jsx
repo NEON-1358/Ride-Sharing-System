@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { getGoogleAuthUrl } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 
 export default function Signup() {
@@ -70,6 +71,7 @@ export default function Signup() {
           <input type="file" accept="image/*" onChange={(event) => setProfilePicture(event.target.files?.[0] || null)} />
         </label>
         <button type="submit" className="solid-button" disabled={loading}>{loading ? "Creating account..." : "Signup"}</button>
+        <a className="google-button" href={getGoogleAuthUrl("signup")}>Continue with Google</a>
         <p className="muted-text">Already have an account? <Link to="/login">Login</Link></p>
       </form>
     </div>

@@ -27,8 +27,8 @@ async function parseResponse(response) {
   return payload;
 }
 
-async function request(path, options = {}) {
-  const token = getToken();
+async function request(path, options = {}, tokenOverride) {
+  const token = tokenOverride || getToken();
   const headers = new Headers(options.headers || {});
 
   if (!(options.body instanceof FormData) && !headers.has("Content-Type")) {
@@ -71,12 +71,13 @@ export function updateProfile(formData) {
 }
 
 export function listRides(params = {}) {
+  const token = getToken();
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") search.set(key, String(value));
   });
   const suffix = search.toString() ? `?${search.toString()}` : "";
-  return request(`/rides${suffix}`);
+  return request(`/rides${suffix}`, {}, token);
 }
 
 export function createRide(payload) {
@@ -123,4 +124,6 @@ export function listAdminOverview() {
   return request("/admin/overview");
 }
 
-export const googleAuthUrl = `${API_BASE}/auth/google`;
+export function getGoogleAuthUrl(from = "login") {
+  return `${API_BASE}/auth/google?from=${from}`;
+}

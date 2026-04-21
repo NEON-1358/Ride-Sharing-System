@@ -3,6 +3,10 @@ const { v4: uuidv4 } = require("uuid");
 
 const NotificationSchema = new mongoose.Schema(
   {
+    _id: {
+      type: String,
+      default: uuidv4,
+    },
     publicId: {
       type: String,
       default: uuidv4,
@@ -10,7 +14,7 @@ const NotificationSchema = new mongoose.Schema(
       index: true,
     },
     user: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: String,
       ref: "User",
       required: true,
       index: true,

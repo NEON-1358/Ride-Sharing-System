@@ -1,4 +1,5 @@
 const express = require("express");
+const path = require("path");
 const cors = require("cors");
 const session = require("express-session");
 require("dotenv").config();
@@ -31,6 +32,7 @@ app.use(
 );
 app.use(passport.initialize());
 app.use(passport.session());
+app.use("/uploads", express.static(path.join(__dirname, "../data/uploads")));
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
@@ -52,7 +54,9 @@ app.use((err, _req, res, _next) => {
     return res.status(401).json({ message: err.message });
   }
 
-  console.error(err);
+  if (process.env.NODE_ENV !== "test") {
+    console.error(err);
+  }
   return res.status(500).json({ message: "Something went wrong." });
 });
 

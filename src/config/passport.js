@@ -37,6 +37,7 @@ passport.use(
       clientID: process.env.GOOGLE_CLIENT_ID || "placeholder_google_client_id",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "placeholder_google_client_secret",
       callbackURL: "/api/auth/google/callback",
+      proxy: true,
     },
     async (_accessToken, _refreshToken, profile, done) => {
       try {
@@ -52,12 +53,19 @@ passport.use(
             googleId: profile.id,
             profilePictureUrl: profile.photos?.[0]?.value || "",
           });
-        } else if (!user.googleId) {
-          user.googleId = profile.id;
+        } else {
+          let changed = false;
+          if (!user.googleId) {
+            user.googleId = profile.id;
+            changed = true;
+          }
           if (!user.profilePictureUrl && profile.photos?.[0]?.value) {
             user.profilePictureUrl = profile.photos[0].value;
+            changed = true;
           }
-          await user.save();
+          if (changed) {
+            await user.save();
+          }
         }
 
         return done(null, user);
