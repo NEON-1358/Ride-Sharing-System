@@ -1,3 +1,10 @@
+function buildPictureUrl(rawUrl) {
+  if (!rawUrl) return "";
+  if (rawUrl.startsWith("http")) return rawUrl;
+  const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+  return `${baseUrl}/uploads/${rawUrl.replace(/^\/uploads\//, "")}`;
+}
+
 function toUserProfile(user) {
   if (!user) return null;
 
@@ -5,7 +12,7 @@ function toUserProfile(user) {
     id: user.publicId,
     name: user.name,
     email: user.email,
-    profilePictureUrl: user.profilePictureUrl || "",
+    profilePictureUrl: buildPictureUrl(user.profilePictureUrl),
     joinedAt: user.joinedAt,
     totalRidesParticipated: user.totalRidesParticipated || 0,
     ratings: {
@@ -39,7 +46,7 @@ function toRideCard(ride, currentUserId) {
       ? {
           id: creator.publicId,
           name: creator.name,
-          profilePictureUrl: creator.profilePictureUrl || "",
+          profilePictureUrl: buildPictureUrl(creator.profilePictureUrl),
           ratings: {
             average: Number(creator.ratings?.average || 0),
             count: Number(creator.ratings?.count || 0),
@@ -56,7 +63,7 @@ function toRideCard(ride, currentUserId) {
             id: passenger.user.publicId,
             name: passenger.user.name,
             email: passenger.user.email,
-            profilePictureUrl: passenger.user.profilePictureUrl || "",
+            profilePictureUrl: buildPictureUrl(passenger.user.profilePictureUrl),
           }
         : null,
     })),
@@ -106,7 +113,7 @@ function toBooking(booking) {
           id: booking.user.publicId,
           name: booking.user.name,
           email: booking.user.email,
-          profilePictureUrl: booking.user.profilePictureUrl || "",
+          profilePictureUrl: buildPictureUrl(booking.user.profilePictureUrl),
         }
       : null,
   };
@@ -124,7 +131,7 @@ function toReview(review) {
       ? {
           id: review.reviewer.publicId,
           name: review.reviewer.name,
-          profilePictureUrl: review.reviewer.profilePictureUrl || "",
+          profilePictureUrl: buildPictureUrl(review.reviewer.profilePictureUrl),
         }
       : null,
   };
