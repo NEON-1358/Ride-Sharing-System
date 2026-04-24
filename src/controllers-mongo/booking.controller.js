@@ -22,7 +22,8 @@ exports.createBooking = async (req, res) => {
     return res.status(404).json({ message: "Ride not found." });
   }
 
-  if (String(ride.creator._id) === String(req.user._id)) {
+  const creatorId = ride.creator?._id || ride.creator;
+  if (String(creatorId) === String(req.user._id)) {
     return res.status(400).json({ message: "You cannot book your own ride." });
   }
 
@@ -33,10 +34,10 @@ exports.createBooking = async (req, res) => {
   const duplicate = await Booking.findOne({
     ride: ride._id,
     user: req.user._id,
-    status: "Booked",
+    status: { $in: ["Pending", "Accepted"] },
   });
   if (duplicate) {
-    return res.status(409).json({ message: "You already booked this ride." });
+    return res.status(409).json({ message: "You already have an active booking or request for this ride." });
   }
 
   const updatedRide = await Ride.findOneAndUpdate(
@@ -47,9 +48,6 @@ exports.createBooking = async (req, res) => {
     },
     {
       $inc: { availableSeats: -value.seats },
-      $set: {
-        status: ride.availableSeats - value.seats === 0 ? "Confirmed" : ride.status,
-      },
     },
     { new: true }
   );
@@ -62,27 +60,33 @@ exports.createBooking = async (req, res) => {
     ride: updatedRide._id,
     user: req.user._id,
     seats: value.seats,
+    status: "Pending",
   });
 
-  await createNotification({
-    user: req.user._id,
-    type: "booking_created",
-    message: `You booked ${value.seats} seat(s) from ${updatedRide.source} to ${updatedRide.destination}.`,
-    metadata: {
-      ridePublicId: updatedRide.publicId,
-      bookingPublicId: booking.publicId,
-    },
-  });
+  const passengerId = req.user?._id;
+  if (passengerId) {
+    await createNotification({
+      user: passengerId,
+      type: "booking_created",
+      message: `You requested ${value.seats} seat(s) from ${updatedRide.source} to ${updatedRide.destination}. Waiting for driver approval.`,
+      metadata: {
+        ridePublicId: updatedRide.publicId,
+        bookingPublicId: booking.publicId,
+      },
+    });
+  }
 
-  await createNotification({
-    user: updatedRide.creator,
-    type: "booking_received",
-    message: `${req.user.name} booked ${value.seats} seat(s) on your ride from ${updatedRide.source} to ${updatedRide.destination}.`,
-    metadata: {
-      ridePublicId: updatedRide.publicId,
-      bookingPublicId: booking.publicId,
-    },
-  });
+  if (creatorId) {
+    await createNotification({
+      user: creatorId,
+      type: "booking_received",
+      message: `${req.user?.name || "Someone"} requested ${value.seats} seat(s) on your ride from ${updatedRide.source} to ${updatedRide.destination}.`,
+      metadata: {
+        ridePublicId: updatedRide.publicId,
+        bookingPublicId: booking.publicId,
+      },
+    });
+  }
 
   const populated = await Booking.findById(booking._id)
     .populate({
@@ -118,15 +122,21 @@ exports.cancelBooking = async (req, res) => {
     return res.status(404).json({ message: "Booking not found." });
   }
 
-  if (String(booking.user._id) !== String(req.user._id)) {
-    return res.status(403).json({ message: "Only the booking owner can cancel this booking." });
+  const bookingUserId = booking.user?._id || booking.user;
+  const creatorId = booking.ride?.creator?._id || booking.ride?.creator;
+
+  const isPassenger = String(bookingUserId) === String(req.user._id);
+  const isCreator = String(creatorId) === String(req.user._id);
+
+  if (!isPassenger && !isCreator) {
+    return res.status(403).json({ message: "Only the booking owner or ride creator can cancel this booking." });
   }
 
-  if (booking.status !== "Booked") {
-    return res.status(400).json({ message: "Only active bookings can be cancelled." });
+  if (!["Pending", "Accepted"].includes(booking.status)) {
+    return res.status(400).json({ message: "Only active or pending bookings can be cancelled." });
   }
 
-  if (["Completed", "Cancelled"].includes(booking.ride.status)) {
+  if (booking.ride && ["Completed", "Cancelled"].includes(booking.ride.status)) {
     return res.status(400).json({ message: "This booking can no longer be cancelled." });
   }
 
@@ -134,34 +144,41 @@ exports.cancelBooking = async (req, res) => {
   booking.cancelledAt = new Date();
   await booking.save();
 
-  const ride = await Ride.findByIdAndUpdate(
-    booking.ride._id,
-    {
-      $inc: { availableSeats: booking.seats },
-      $set: { status: "Open" },
-    },
-    { new: true }
-  );
+  if (booking.ride) {
+    await Ride.findByIdAndUpdate(
+      booking.ride._id,
+      {
+        $inc: { availableSeats: booking.seats },
+      },
+      { new: true }
+    );
+  }
 
-  await createNotification({
-    user: req.user._id,
-    type: "booking_cancelled",
-    message: `You cancelled your booking from ${ride.source} to ${ride.destination}.`,
-    metadata: {
-      ridePublicId: ride.publicId,
-      bookingPublicId: booking.publicId,
-    },
-  });
+  const passengerId = booking.user?._id || booking.user;
+  if (passengerId && booking.ride) {
+    await createNotification({
+      user: passengerId,
+      type: "booking_cancelled",
+      message: `You cancelled your booking from ${booking.ride.source} to ${booking.ride.destination}.`,
+      metadata: {
+        ridePublicId: booking.ride.publicId,
+        bookingPublicId: booking.publicId,
+      },
+    });
+  }
 
-  await createNotification({
-    user: booking.ride.creator._id,
-    type: "booking_cancelled",
-    message: `${req.user.name} cancelled a booking on your ride from ${ride.source} to ${ride.destination}.`,
-    metadata: {
-      ridePublicId: ride.publicId,
-      bookingPublicId: booking.publicId,
-    },
-  });
+  const rideCreatorId = booking.ride?.creator?._id || booking.ride?.creator;
+  if (rideCreatorId && booking.ride) {
+    await createNotification({
+      user: rideCreatorId,
+      type: "booking_cancelled",
+      message: `${req.user?.name || "Someone"} cancelled a booking on your ride from ${booking.ride.source} to ${booking.ride.destination}.`,
+      metadata: {
+        ridePublicId: booking.ride.publicId,
+        bookingPublicId: booking.publicId,
+      },
+    });
+  }
 
   const populated = await Booking.findById(booking._id)
     .populate({
@@ -171,4 +188,89 @@ exports.cancelBooking = async (req, res) => {
     .populate("user");
 
   return res.json(toBooking(populated));
+};
+
+exports.acceptBooking = async (req, res) => {
+  const booking = await Booking.findOne({ publicId: req.params.bookingId })
+    .populate({
+      path: "ride",
+      populate: { path: "creator" },
+    })
+    .populate("user");
+
+  if (!booking) {
+    return res.status(404).json({ message: "Booking not found." });
+  }
+
+  const creatorId = booking.ride.creator?._id || booking.ride.creator;
+  if (String(creatorId) !== String(req.user._id)) {
+    return res.status(403).json({ message: "Only the ride creator can accept bookings." });
+  }
+
+  if (booking.status !== "Pending") {
+    return res.status(400).json({ message: "Only pending bookings can be accepted." });
+  }
+
+  booking.status = "Accepted";
+  await booking.save();
+
+  const passengerId = booking.user?._id || booking.user;
+  if (passengerId) {
+    await createNotification({
+      user: passengerId,
+      type: "booking_accepted",
+      message: `Your booking request from ${booking.ride.source} to ${booking.ride.destination} has been accepted!`,
+      metadata: {
+        ridePublicId: booking.ride.publicId,
+        bookingPublicId: booking.publicId,
+      },
+    });
+  }
+
+  return res.json(toBooking(booking));
+};
+
+exports.rejectBooking = async (req, res) => {
+  const booking = await Booking.findOne({ publicId: req.params.bookingId })
+    .populate({
+      path: "ride",
+      populate: { path: "creator" },
+    })
+    .populate("user");
+
+  if (!booking) {
+    return res.status(404).json({ message: "Booking not found." });
+  }
+
+  const creatorId = booking.ride.creator?._id || booking.ride.creator;
+  if (String(creatorId) !== String(req.user._id)) {
+    return res.status(403).json({ message: "Only the ride creator can reject bookings." });
+  }
+
+  if (booking.status !== "Pending") {
+    return res.status(400).json({ message: "Only pending bookings can be rejected." });
+  }
+
+  booking.status = "Rejected";
+  await booking.save();
+
+  // Return seats to the ride
+  await Ride.findByIdAndUpdate(booking.ride._id, {
+    $inc: { availableSeats: booking.seats },
+  });
+
+  const passengerId = booking.user?._id || booking.user;
+  if (passengerId) {
+    await createNotification({
+      user: passengerId,
+      type: "booking_rejected",
+      message: `Your booking request from ${booking.ride.source} to ${booking.ride.destination} was rejected.`,
+      metadata: {
+        ridePublicId: booking.ride.publicId,
+        bookingPublicId: booking.publicId,
+      },
+    });
+  }
+
+  return res.json(toBooking(booking));
 };

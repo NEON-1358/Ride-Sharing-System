@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { updateProfile } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 
 export default function Profile() {
   const { user, reviews, refreshUser } = useAuth();
+  const { showToast } = useToast();
   const [name, setName] = useState(user.name);
   const [profilePicture, setProfilePicture] = useState(null);
-  const [message, setMessage] = useState("");
   const initials = useMemo(() => user.name.split(" ").map((part) => part[0]).slice(0, 2).join(""), [user.name]);
 
   async function handleSubmit(event) {
@@ -18,9 +19,9 @@ export default function Profile() {
     try {
       await updateProfile(payload);
       await refreshUser();
-      setMessage("Profile updated successfully.");
+      showToast("Profile updated successfully.");
     } catch (error) {
-      setMessage(error.message);
+      showToast(error.message, 'error');
     }
   }
 
@@ -47,7 +48,6 @@ export default function Profile() {
               <p>Keep your public details up to date.</p>
             </div>
           </div>
-          {message ? <div className="flash-message">{message}</div> : null}
           <form className="stack-form" onSubmit={handleSubmit}>
             <label>
               <span>Name</span>

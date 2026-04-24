@@ -108,6 +108,14 @@ export function cancelBooking(bookingId) {
   return request(`/bookings/${bookingId}/cancel`, { method: "PATCH" });
 }
 
+export function acceptBooking(bookingId) {
+  return request(`/bookings/${bookingId}/accept`, { method: "PATCH" });
+}
+
+export function rejectBooking(bookingId) {
+  return request(`/bookings/${bookingId}/reject`, { method: "PATCH" });
+}
+
 export function listNotifications() {
   return request("/notifications");
 }

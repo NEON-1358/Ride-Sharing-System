@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
 
 export default function CreateRide() {
+  const { showToast } = useToast();
   const [formData, setFormData] = useState({
     origin: '',
     destination: '',
@@ -18,7 +20,7 @@ export default function CreateRide() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
-    if (!token) return alert('You must be logged in as a driver!');
+    if (!token) return showToast('You must be logged in as a driver!', 'error');
 
     try {
       const res = await fetch('http://localhost:3000/api/rides', {
@@ -30,14 +32,14 @@ export default function CreateRide() {
         body: JSON.stringify(formData)
       });
       if (res.ok) {
-        alert('Ride created successfully!');
+        showToast('Ride created successfully!');
         navigate('/rides');
       } else {
         const error = await res.json();
-        alert(error.message || 'Failed to create ride. Ensure you are registered as a Driver.');
+        showToast(error.message || 'Failed to create ride. Ensure you are registered as a Driver.', 'error');
       }
     } catch (err) {
-      console.error(err);
+      showToast(err.message, 'error');
     }
   };
 
@@ -66,10 +68,12 @@ export default function CreateRide() {
             <div className="form-group" style={{ flex: 1 }}>
               <label>Seats</label>
               <input type="number" name="seatsAvailable" className="form-control" min="1" max="8" value={formData.seatsAvailable} onChange={handleChange} required />
+              <small className="muted-text">Maximum 8 seats per ride</small>
             </div>
             <div className="form-group" style={{ flex: 1 }}>
               <label>Price</label>
               <input type="number" name="price" className="form-control" min="0" value={formData.price} onChange={handleChange} required />
+              <small className="muted-text">Price per seat in USD</small>
             </div>
           </div>
           <button type="submit" className="btn-primary" style={{ width: '100%' }}>

@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { createBooking, listNotifications, listRides, markNotificationsRead } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 
 const initialFilters = { source: "", destination: "", dateFrom: "", dateTo: "", seats: "", page: 1, limit: 6 };
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [filters, setFilters] = useState(initialFilters);
   const [rides, setRides] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
 
   async function loadData(nextFilters = filters) {
     setLoading(true);
@@ -21,7 +22,7 @@ export default function Dashboard() {
       setPagination(rideResponse.pagination || { page: 1, totalPages: 1, total: 0 });
       setNotifications(notificationResponse || []);
     } catch (error) {
-      setMessage(error.message);
+      showToast(error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -49,14 +50,21 @@ export default function Dashboard() {
     await loadData(nextFilters);
   }
 
-  async function handleBook(rideId, seats) {
+  const [selectedSeats, setSelectedSeats] = useState({});
+
+  async function handleBook(rideId) {
+    const seats = selectedSeats[rideId] || 1;
     try {
       await createBooking({ rideId, seats });
-      setMessage("Ride booked successfully.");
+      showToast("Ride booked successfully.");
       await loadData();
     } catch (error) {
-      setMessage(error.message);
+      showToast(error.message, 'error');
     }
+  }
+
+  function updateSelectedSeats(rideId, value) {
+    setSelectedSeats(current => ({ ...current, [rideId]: parseInt(value, 10) }));
   }
 
   async function handleReadNotifications() {
@@ -78,8 +86,6 @@ export default function Dashboard() {
           <div className="stat-card"><span>Rating</span><strong>{user.ratings.average.toFixed(1)} / 5</strong></div>
         </div>
       </section>
-
-      {message ? <div className="flash-message">{message}</div> : null}
 
       <section className="content-grid">
         <div className="panel">
@@ -115,9 +121,27 @@ export default function Dashboard() {
                 </div>
                 <p className="ride-description">{ride.description || "No extra notes for this trip."}</p>
                 <div className="ride-actions">
-                  <button type="button" className="solid-button" disabled={!ride.permissions.canBook} onClick={() => handleBook(ride.id, 1)}>
-                    {ride.permissions.canBook ? "Book 1 seat" : "Unavailable"}
-                  </button>
+                  {ride.permissions.canBook && (
+                    <div className="booking-controls" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <select 
+                        value={selectedSeats[ride.id] || 1} 
+                        onChange={(e) => updateSelectedSeats(ride.id, e.target.value)}
+                        style={{ width: 'auto', padding: '0.4rem' }}
+                      >
+                        {[...Array(ride.availableSeats)].map((_, i) => (
+                          <option key={i + 1} value={i + 1}>{i + 1} seat{i > 0 ? 's' : ''}</option>
+                        ))}
+                      </select>
+                      <button type="button" className="solid-button" onClick={() => handleBook(ride.id)}>
+                        Book Now
+                      </button>
+                    </div>
+                  )}
+                  {!ride.permissions.canBook && (
+                    <button type="button" className="solid-button" disabled>
+                      {ride.permissions.hasBooked ? "Booked/Requested" : "Unavailable"}
+                    </button>
+                  )}
                 </div>
               </article>
             ))}

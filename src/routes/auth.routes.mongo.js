@@ -1,7 +1,7 @@
 const express = require("express");
 const passport = require("passport");
 const authController = require("../controllers-mongo/auth.controller");
-const authMiddleware = require("../middleware/auth.middleware");
+const { authMiddleware } = require("../middleware/auth.middleware");
 const { upload } = require("../config/cloudinary");
 
 const router = express.Router();

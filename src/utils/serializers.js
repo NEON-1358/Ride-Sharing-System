@@ -66,11 +66,17 @@ function toRideCard(ride, currentUserId) {
             profilePictureUrl: buildPictureUrl(passenger.user.profilePictureUrl),
           }
         : null,
+      permissions: {
+        canAccept: creator.publicId === currentUserId && passenger.status === "Pending",
+        canReject: creator.publicId === currentUserId && passenger.status === "Pending",
+        canCancel: (creator.publicId === currentUserId || (passenger.user && passenger.user.publicId === currentUserId)) && ["Pending", "Accepted"].includes(passenger.status),
+      },
     })),
     permissions: {
       canEdit: creator.publicId === currentUserId && !["Completed", "Cancelled"].includes(ride.status),
       canDelete: creator.publicId === currentUserId,
       canComplete: creator.publicId === currentUserId && ride.status !== "Completed" && ride.status !== "Cancelled",
+      hasBooked,
       canBook:
         Boolean(currentUserId) &&
         creator.publicId !== currentUserId &&

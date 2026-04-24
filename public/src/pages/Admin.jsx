@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { listAdminOverview } from "../utils/api";
+import { useToast } from "../context/ToastContext";
 
 export default function Admin() {
+  const { showToast } = useToast();
   const [data, setData] = useState({ users: [], rides: [], bookings: [] });
-  const [error, setError] = useState("");
 
   useEffect(() => {
-    listAdminOverview().then(setData).catch((err) => setError(err.message));
+    listAdminOverview().then(setData).catch((err) => showToast(err.message, 'error'));
   }, []);
 
   return (
@@ -18,7 +19,6 @@ export default function Admin() {
             <p>Simple validation view for users, rides, and bookings.</p>
           </div>
         </div>
-        {error ? <div className="flash-message error">{error}</div> : null}
         <div className="admin-grid">
           <div>
             <h2>Users</h2>
