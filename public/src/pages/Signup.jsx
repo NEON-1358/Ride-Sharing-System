@@ -2,9 +2,11 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getGoogleAuthUrl } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 
 export default function Signup() {
   const { signup } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const [form, setForm] = useState({
     name: "",
@@ -13,7 +15,6 @@ export default function Signup() {
     confirmPassword: "",
   });
   const [profilePicture, setProfilePicture] = useState(null);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   function updateField(event) {
@@ -22,9 +23,8 @@ export default function Signup() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setError("");
-    if (form.password.length < 8) return setError("Password must be at least 8 characters.");
-    if (form.password !== form.confirmPassword) return setError("Passwords do not match.");
+    if (form.password.length < 8) return showToast("Password must be at least 8 characters.", "error");
+    if (form.password !== form.confirmPassword) return showToast("Passwords do not match.", "error");
 
     const payload = new FormData();
     payload.append("name", form.name);
@@ -37,7 +37,7 @@ export default function Signup() {
       await signup(payload);
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      setError(err.message);
+      showToast(err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -49,7 +49,6 @@ export default function Signup() {
         <p className="eyebrow">Create account</p>
         <h1>Join CarPool Hub</h1>
         <p className="muted-text">Add a profile picture now or update it later from your profile.</p>
-        {error ? <div className="flash-message error">{error}</div> : null}
         <label>
           <span>Full name</span>
           <input type="text" name="name" value={form.name} onChange={updateField} required />

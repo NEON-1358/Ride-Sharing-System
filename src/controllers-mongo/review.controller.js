@@ -44,16 +44,17 @@ exports.createReview = async (req, res) => {
     return res.status(409).json({ message: "You have already reviewed this ride." });
   }
 
+  const creatorId = ride.creator?._id || ride.creator;
   const review = await Review.create({
     ride: ride._id,
     reviewer: req.user._id,
-    reviewee: ride.creator._id,
+    reviewee: creatorId,
     rating: value.rating,
     comment: value.comment || "",
   });
 
   const stats = await Review.aggregate([
-    { $match: { reviewee: ride.creator._id } },
+    { $match: { reviewee: creatorId } },
     {
       $group: {
         _id: "$reviewee",
@@ -64,7 +65,7 @@ exports.createReview = async (req, res) => {
   ]);
 
   const summary = stats[0] || { average: 0, count: 0 };
-  await User.findByIdAndUpdate(ride.creator._id, {
+  await User.findByIdAndUpdate(creatorId, {
     $set: {
       "ratings.average": Number(summary.average.toFixed(1)),
       "ratings.count": summary.count,
@@ -72,7 +73,7 @@ exports.createReview = async (req, res) => {
   });
 
   await createNotification({
-    user: ride.creator._id,
+    user: creatorId,
     type: "review_received",
     message: `${req.user.name} left you a ${value.rating}-star review.`,
     metadata: {

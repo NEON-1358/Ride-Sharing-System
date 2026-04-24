@@ -1,6 +1,6 @@
 const express = require("express");
 const reviewController = require("../controllers-mongo/review.controller");
-const authMiddleware = require("../middleware/auth.middleware");
+const { authMiddleware } = require("../middleware/auth.middleware");
 
 const router = express.Router();
 

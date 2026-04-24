@@ -2,26 +2,26 @@ import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getGoogleAuthUrl } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 
 export default function Login() {
   const { login } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setError("");
     setLoading(true);
 
     try {
       await login({ email, password });
       navigate(location.state?.from || "/dashboard", { replace: true });
     } catch (err) {
-      setError(err.message);
+      showToast(err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -33,7 +33,6 @@ export default function Login() {
         <p className="eyebrow">Welcome back</p>
         <h1>Login to your account</h1>
         <p className="muted-text">Use the same login for riders and ride creators.</p>
-        {error ? <div className="flash-message error">{error}</div> : null}
         <label>
           <span>Email</span>
           <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from '../context/ToastContext';
 
 export default function Rides() {
+  const { showToast } = useToast();
   const [rides, setRides] = useState([]);
   
   useEffect(() => {
@@ -15,13 +17,13 @@ export default function Rides() {
         setRides(data);
       }
     } catch (err) {
-      console.error(err);
+      showToast(err.message, 'error');
     }
   };
 
   const bookRide = async (rideId) => {
     const token = localStorage.getItem('token');
-    if (!token) return alert('Please login first!');
+    if (!token) return showToast('Please login first!', 'error');
     
     try {
       const res = await fetch('http://localhost:3000/api/bookings', {
@@ -32,10 +34,10 @@ export default function Rides() {
         },
         body: JSON.stringify({ rideId, seatsNeeded: 1 })
       });
-      if (res.ok) alert('Ride booked successfully!');
-      else alert('Failed to book ride');
+      if (res.ok) showToast('Ride booked successfully!');
+      else showToast('Failed to book ride', 'error');
     } catch (err) {
-      console.error(err);
+      showToast(err.message, 'error');
     }
   };
 

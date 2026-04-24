@@ -27,7 +27,7 @@ const rideUpdateSchema = Joi.object({
 
 async function loadRideForOutput(rideId, currentUserPublicId) {
   const ride = await Ride.findById(rideId).populate("creator");
-  const passengers = await Booking.find({ ride: rideId, status: { $in: ["Booked", "Completed"] } })
+  const passengers = await Booking.find({ ride: rideId, status: { $in: ["Pending", "Accepted", "Completed"] } })
     .populate("user")
     .sort({ createdAt: 1 });
 
@@ -43,7 +43,7 @@ async function loadRideForOutput(rideId, currentUserPublicId) {
 async function processCompletion(ride) {
   if (ride.completedProcessed) return;
 
-  const bookings = await Booking.find({ ride: ride._id, status: "Booked" });
+  const bookings = await Booking.find({ ride: ride._id, status: "Accepted" });
   const userSeatCounts = new Map();
 
   for (const booking of bookings) {
@@ -53,6 +53,9 @@ async function processCompletion(ride) {
     const previous = userSeatCounts.get(String(booking.user)) || 0;
     userSeatCounts.set(String(booking.user), previous + booking.seats);
   }
+
+  // Handle pending bookings (they get cancelled as they weren't accepted in time)
+  await Booking.updateMany({ ride: ride._id, status: "Pending" }, { status: "Cancelled", cancelledAt: new Date() });
 
   await User.findByIdAndUpdate(ride.creator, { $inc: { totalRidesParticipated: 1 } });
   for (const [userId, seats] of userSeatCounts.entries()) {
@@ -64,26 +67,29 @@ async function processCompletion(ride) {
 }
 
 async function cancelRideAndBookings(ride, actor, cancelledReason = "") {
-  const activeBookings = await Booking.find({ ride: ride._id, status: "Booked" }).populate("user");
+  const activeBookings = await Booking.find({ ride: ride._id, status: { $in: ["Pending", "Accepted"] } }).populate("user");
 
   for (const booking of activeBookings) {
     booking.status = "Cancelled";
     booking.cancelledAt = new Date();
     await booking.save();
 
-    await createNotification({
-      user: booking.user._id,
-      type: "ride_cancelled",
-      message: `Ride from ${ride.source} to ${ride.destination} was cancelled.`,
-      metadata: {
-        ridePublicId: ride.publicId,
-        bookingPublicId: booking.publicId,
-      },
-    });
+    const passengerId = booking.user?._id || booking.user;
+    if (passengerId) {
+      await createNotification({
+        user: passengerId,
+        type: "ride_cancelled",
+        message: `Ride from ${ride.source} to ${ride.destination} was cancelled.`,
+        metadata: {
+          ridePublicId: ride.publicId,
+          bookingPublicId: booking.publicId,
+        },
+      });
+    }
   }
 
   ride.status = "Cancelled";
-  ride.cancelledReason = cancelledReason || `Cancelled by ${actor.name}`;
+  ride.cancelledReason = cancelledReason || `Cancelled by ${actor?.name || "System"}`;
   ride.availableSeats = ride.totalSeats;
   await ride.save();
 }
@@ -96,8 +102,11 @@ exports.listRides = async (req, res) => {
 
   if (req.query.status) {
     query.status = req.query.status;
-  } else {
+  } else if (req.query.mine === "true") {
     query.status = { $ne: "Cancelled" };
+  } else {
+    // For dashboard, only show bookable rides
+    query.status = "Open";
   }
 
   if (req.query.source) {
@@ -118,8 +127,19 @@ exports.listRides = async (req, res) => {
     query.availableSeats = { $gte: Number(req.query.seats) };
   }
 
-  if (req.query.mine === "true" && req.user) {
-    query.creator = req.user._id;
+  if (req.user) {
+    if (req.query.mine === "true") {
+      query.creator = req.user._id;
+    } else {
+      // For dashboard, don't show user's own rides since they can't book them
+      query.creator = { $ne: req.user._id };
+    }
+  } else if (req.query.mine === "true") {
+    // If mine=true but no user, return empty results
+    return res.json({
+      items: [],
+      pagination: { page, limit, total: 0, totalPages: 1 },
+    });
   }
 
   const [total, rides] = await Promise.all([
@@ -134,7 +154,7 @@ exports.listRides = async (req, res) => {
   const rideIds = rides.map((ride) => ride._id);
   const bookingDocs = await Booking.find({
     ride: { $in: rideIds },
-    status: { $in: ["Booked", "Completed"] },
+    status: { $in: ["Pending", "Accepted", "Completed"] },
   }).populate("user");
 
   const bookingMap = bookingDocs.reduce((map, booking) => {
@@ -169,7 +189,7 @@ exports.getRide = async (req, res) => {
     return res.status(404).json({ message: "Ride not found." });
   }
 
-  const passengers = await Booking.find({ ride: ride._id, status: { $in: ["Booked", "Completed"] } })
+  const passengers = await Booking.find({ ride: ride._id, status: { $in: ["Pending", "Accepted", "Completed"] } })
     .populate("user")
     .sort({ createdAt: 1 });
 
@@ -219,15 +239,16 @@ exports.updateRide = async (req, res) => {
     return res.status(404).json({ message: "Ride not found." });
   }
 
-  if (String(ride.creator) !== String(req.user._id)) {
-    return res.status(403).json({ message: "Only the ride creator can edit this ride." });
+  const rideCreatorId = ride.creator?._id || ride.creator;
+  if (String(rideCreatorId) !== String(req.user._id)) {
+    return res.status(403).json({ message: "Only the ride creator can update this ride." });
   }
 
   if (["Completed", "Cancelled"].includes(ride.status)) {
     return res.status(400).json({ message: "Completed or cancelled rides cannot be edited." });
   }
 
-  const activeBookings = await Booking.find({ ride: ride._id, status: "Booked" });
+  const activeBookings = await Booking.find({ ride: ride._id, status: { $in: ["Pending", "Accepted"] } });
   const reservedSeats = activeBookings.reduce((sum, booking) => sum + booking.seats, 0);
 
   if (value.totalSeats && value.totalSeats < reservedSeats) {
@@ -260,11 +281,12 @@ exports.deleteRide = async (req, res) => {
     return res.status(404).json({ message: "Ride not found." });
   }
 
-  if (String(ride.creator) !== String(req.user._id)) {
+  const rideCreatorId = ride.creator?._id || ride.creator;
+  if (String(rideCreatorId) !== String(req.user._id)) {
     return res.status(403).json({ message: "Only the ride creator can delete this ride." });
   }
 
-  const activeCount = await Booking.countDocuments({ ride: ride._id, status: "Booked" });
+  const activeCount = await Booking.countDocuments({ ride: ride._id, status: { $in: ["Pending", "Accepted"] } });
   if (activeCount > 0) {
     await cancelRideAndBookings(ride, req.user, "Ride deleted after bookings existed.");
     return res.json({ message: "Ride had bookings, so it was cancelled instead of hard deleted." });
@@ -288,8 +310,9 @@ exports.updateRideStatus = async (req, res) => {
     return res.status(404).json({ message: "Ride not found." });
   }
 
-  if (String(ride.creator) !== String(req.user._id)) {
-    return res.status(403).json({ message: "Only the ride creator can change ride status." });
+  const rideCreatorId = ride.creator?._id || ride.creator;
+  if (String(rideCreatorId) !== String(req.user._id)) {
+    return res.status(403).json({ message: "Only the ride creator can update this ride status." });
   }
 
   if (status === "Completed") {

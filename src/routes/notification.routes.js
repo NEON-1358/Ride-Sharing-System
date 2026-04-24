@@ -1,6 +1,6 @@
 const express = require("express");
 const notificationController = require("../controllers-mongo/notification.controller");
-const authMiddleware = require("../middleware/auth.middleware");
+const { authMiddleware } = require("../middleware/auth.middleware");
 
 const router = express.Router();
 

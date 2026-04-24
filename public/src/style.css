@@ -126,6 +126,18 @@ h2, h3 { margin: 0; }
   gap: 0.9rem;
 }
 
+.input-group, .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.input-group small, .form-group small {
+  font-size: 0.8rem;
+  margin-top: -0.2rem;
+  margin-left: 0.5rem;
+}
+
 .ride-card, .booking-item, .review-item, .notification-item {
   padding: 1.15rem;
   border-radius: 22px;
@@ -147,13 +159,51 @@ h2, h3 { margin: 0; }
 .status-completed { background: #dbe8ff; color: #244a9c; }
 .status-cancelled { background: #fde1df; color: #8a2f2f; }
 
-.flash-message {
-  margin: 1rem 0;
-  padding: 0.95rem 1rem;
-  border-radius: 18px;
-  background: var(--accent-soft);
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-.flash-message.error { background: #f7d8d8; color: var(--danger); }
+
+.toast {
+  padding: 1rem 1.5rem;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--line);
+  color: var(--page-ink);
+  font-weight: 600;
+  min-width: 280px;
+  animation: slideIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toast-success {
+  border-left: 6px solid var(--accent);
+}
+
+.toast-error {
+  border-left: 6px solid var(--danger);
+  color: var(--danger);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
 .notification-item.unread { border-color: rgba(22, 93, 74, 0.24); }
 .notification-item span { display: block; margin-top: 0.35rem; color: var(--muted); font-size: 0.9rem; }
 
