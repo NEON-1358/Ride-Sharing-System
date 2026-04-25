@@ -12,6 +12,8 @@ const bookingRoutes = require("./routes/booking.routes.mongo");
 const reviewRoutes = require("./routes/review.routes.mongo");
 const notificationRoutes = require("./routes/notification.routes");
 const adminRoutes = require("./routes/admin.routes");
+const verifyRoutes = require("./routes/verify.routes.mongo");
+const chatRoutes = require("./routes/chat.routes");
 
 const app = express();
 
@@ -44,6 +46,8 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/verify", verifyRoutes);
+app.use("/api/chat", chatRoutes);
 
 app.use((err, _req, res, _next) => {
   if (err?.name === "UnauthorizedError") {
@@ -55,7 +59,7 @@ app.use((err, _req, res, _next) => {
   }
 
   if (process.env.NODE_ENV !== "test") {
-    console.error(err);
+    console.error("Global Error Handler Caught:", err);
   }
   return res.status(500).json({ message: "Something went wrong." });
 });

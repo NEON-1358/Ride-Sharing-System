@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { acceptBooking, cancelBooking, createReview, createRide, deleteRide, listMyBookings, listRides, rejectBooking, updateRideStatus } from "../utils/api";
 import { useToast } from "../context/ToastContext";
+import ChatBox from "../components/ChatBox";
 
 const createRideState = {
   source: "",
@@ -17,6 +18,7 @@ export default function MyRides() {
   const [myRides, setMyRides] = useState([]);
   const [myBookings, setMyBookings] = useState([]);
   const [reviewDrafts, setReviewDrafts] = useState({});
+  const [activeChat, setActiveChat] = useState(null);
 
   async function loadData() {
     const [ridesResponse, bookingsResponse] = await Promise.all([listRides({ mine: true, limit: 20 }), listMyBookings()]);
@@ -169,6 +171,7 @@ export default function MyRides() {
                           {p.permissions?.canAccept && <button type="button" className="ghost-button" onClick={() => handleAcceptBooking(p.id)}>Accept</button>}
                           {p.permissions?.canReject && <button type="button" className="ghost-button" onClick={() => handleRejectBooking(p.id)}>Reject</button>}
                           {p.permissions?.canCancel && <button type="button" className="ghost-button" onClick={() => handleCancelBooking(p.id)}>Cancel</button>}
+                          <button type="button" className="ghost-button" onClick={() => setActiveChat({ id: p.id, ownerId: ride.creatorId, ownerName: ride.creator?.name, passengerId: p.user?.id })}>Chat</button>
                         </div>
                       </div>
                     ))}
@@ -206,7 +209,14 @@ export default function MyRides() {
                   <span>{booking.seats} seat(s)</span>
                   <span>Driver: {booking.ride?.creator?.name}</span>
                 </div>
-                {["Pending", "Accepted"].includes(booking.status) ? <button type="button" className="ghost-button" onClick={() => handleCancelBooking(booking.id)}>Cancel booking</button> : null}
+                <div className="ride-actions">
+                  {["Pending", "Accepted", "Completed"].includes(booking.status) ? (
+                    <button type="button" className="ghost-button" onClick={() => setActiveChat({ id: booking.id, ownerId: booking.ride?.creator?.id, ownerName: booking.ride?.creator?.name, passengerId: booking.user?.id })}>
+                      Chat with Driver
+                    </button>
+                  ) : null}
+                  {["Pending", "Accepted"].includes(booking.status) ? <button type="button" className="ghost-button" onClick={() => handleCancelBooking(booking.id)}>Cancel booking</button> : null}
+                </div>
                 {booking.status === "Completed" ? (
                   <form className="review-form" onSubmit={(event) => handleReviewSubmit(event, booking.ride.id)}>
                     <select
@@ -238,6 +248,16 @@ export default function MyRides() {
           </div>
         </div>
       </section>
+
+      {activeChat && (
+        <ChatBox 
+          bookingId={activeChat.id} 
+          rideOwnerId={activeChat.ownerId} 
+          rideOwnerName={activeChat.ownerName} 
+          passengerId={activeChat.passengerId}
+          onClose={() => setActiveChat(null)} 
+        />
+      )}
     </div>
   );
 }
