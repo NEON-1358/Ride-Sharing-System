@@ -171,7 +171,7 @@ export default function MyRides() {
                           {p.permissions?.canAccept && <button type="button" className="ghost-button" onClick={() => handleAcceptBooking(p.id)}>Accept</button>}
                           {p.permissions?.canReject && <button type="button" className="ghost-button" onClick={() => handleRejectBooking(p.id)}>Reject</button>}
                           {p.permissions?.canCancel && <button type="button" className="ghost-button" onClick={() => handleCancelBooking(p.id)}>Cancel</button>}
-                          <button type="button" className="ghost-button" onClick={() => setActiveChat({ id: p.id, ownerId: ride.creatorId, ownerName: ride.creator?.name, passengerId: p.user?.id })}>Chat</button>
+                          <button type="button" className="ghost-button" onClick={() => setActiveChat({ id: p.id, ownerId: ride.creator?.id, ownerName: ride.creator?.name, passengerId: p.user?.id })}>Chat</button>
                         </div>
                       </div>
                     ))}

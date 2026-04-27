@@ -25,7 +25,7 @@ const rideUpdateSchema = Joi.object({
   cancelledReason: Joi.string().trim().max(200).allow("").optional(),
 }).min(1);
 
-async function loadRideForOutput(rideId, currentUserPublicId) {
+async function loadRideForOutput(rideId, currentUser) {
   const ride = await Ride.findById(rideId).populate("creator");
   const passengers = await Booking.find({ ride: rideId, status: { $in: ["Pending", "Accepted", "Completed"] } })
     .populate("user")
@@ -36,7 +36,7 @@ async function loadRideForOutput(rideId, currentUserPublicId) {
       ...ride.toObject(),
       passengers,
     },
-    currentUserPublicId
+    currentUser
   );
 }
 
@@ -171,7 +171,7 @@ exports.listRides = async (req, res) => {
           ...ride.toObject(),
           passengers: bookingMap.get(String(ride._id)) || [],
         },
-        req.user?.publicId
+        req.user
       )
     ),
     pagination: {
@@ -199,7 +199,7 @@ exports.getRide = async (req, res) => {
         ...ride.toObject(),
         passengers,
       },
-      req.user?.publicId
+      req.user
     )
   );
 };
