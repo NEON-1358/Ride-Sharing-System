@@ -100,6 +100,10 @@ export function listMyBookings() {
   return request("/bookings/my");
 }
 
+export function getChatHistory(bookingId) {
+  return request(`/chat/history/${bookingId}`);
+}
+
 export function createBooking(payload) {
   return request("/bookings", { method: "POST", body: JSON.stringify(payload) });
 }

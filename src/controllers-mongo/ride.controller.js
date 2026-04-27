@@ -25,7 +25,7 @@ const rideUpdateSchema = Joi.object({
   cancelledReason: Joi.string().trim().max(200).allow("").optional(),
 }).min(1);
 
-async function loadRideForOutput(rideId, currentUserPublicId) {
+async function loadRideForOutput(rideId, currentUser) {
   const ride = await Ride.findById(rideId).populate("creator");
   const passengers = await Booking.find({ ride: rideId, status: { $in: ["Pending", "Accepted", "Completed"] } })
     .populate("user")
@@ -36,7 +36,7 @@ async function loadRideForOutput(rideId, currentUserPublicId) {
       ...ride.toObject(),
       passengers,
     },
-    currentUserPublicId
+    currentUser
   );
 }
 
@@ -171,7 +171,7 @@ exports.listRides = async (req, res) => {
           ...ride.toObject(),
           passengers: bookingMap.get(String(ride._id)) || [],
         },
-        req.user?.publicId
+        req.user
       )
     ),
     pagination: {
@@ -199,31 +199,30 @@ exports.getRide = async (req, res) => {
         ...ride.toObject(),
         passengers,
       },
-      req.user?.publicId
+      req.user
     )
   );
 };
 
-exports.createRide = async (req, res) => {
-  const { error, value } = rideSchema.validate(req.body, { abortEarly: false });
-  if (error) {
-    return res.status(400).json({
-      message: error.details.map((detail) => detail.message).join(" "),
+exports.createRide = async (req, res, next) => {
+  try {
+    const { error, value } = rideSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ message: error.details[0].message });
+    }
+
+    const ride = await Ride.create({
+      ...value,
+      availableSeats: value.totalSeats,
+      creator: req.user._id,
     });
+
+    const populatedRide = await loadRideForOutput(ride._id, req.user.publicId);
+    return res.status(201).json(populatedRide);
+  } catch (err) {
+    console.error("Error in createRide controller:", err);
+    next(err);
   }
-
-  const ride = await Ride.create({
-    creator: req.user._id,
-    source: value.source,
-    destination: value.destination,
-    departureTime: value.departureTime,
-    totalSeats: value.totalSeats,
-    availableSeats: value.totalSeats,
-    price: value.price,
-    description: value.description || "",
-  });
-
-  return res.status(201).json(await loadRideForOutput(ride._id, req.user.publicId));
 };
 
 exports.updateRide = async (req, res) => {

@@ -23,12 +23,27 @@ function toUserProfile(user) {
   };
 }
 
-function toRideCard(ride, currentUserId) {
+function toRideCard(ride, currentUser) {
   if (!ride) return null;
 
+  const currentUserId = typeof currentUser === "string" ? currentUser : currentUser?.publicId;
+  const currentUserMongoId = currentUser?.id || currentUser?._id;
+
   const creator = ride.creator || {};
+  const creatorPublicId = creator.publicId || (typeof creator === "string" ? creator : null);
+  const creatorMongoId = creator._id || creator.id || (typeof creator === "string" ? creator : null);
+
+  const isOwner = (currentUserId && creatorPublicId === currentUserId) || 
+                  (currentUserMongoId && creatorMongoId === currentUserMongoId);
   const passengers = Array.isArray(ride.passengers) ? ride.passengers : [];
-  const hasBooked = passengers.some((passenger) => passenger.user?.publicId === currentUserId);
+  const hasBooked = passengers.some((passenger) => {
+    const pUser = passenger.user || {};
+    const pPublicId = pUser.publicId || (typeof pUser === "string" ? pUser : null);
+    const pMongoId = pUser._id || pUser.id || (typeof pUser === "string" ? pUser : null);
+    
+    return (currentUserId && pPublicId === currentUserId) || 
+           (currentUserMongoId && pMongoId === currentUserMongoId);
+  });
 
   return {
     id: ride.publicId,
@@ -67,19 +82,23 @@ function toRideCard(ride, currentUserId) {
           }
         : null,
       permissions: {
-        canAccept: creator.publicId === currentUserId && passenger.status === "Pending",
-        canReject: creator.publicId === currentUserId && passenger.status === "Pending",
-        canCancel: (creator.publicId === currentUserId || (passenger.user && passenger.user.publicId === currentUserId)) && ["Pending", "Accepted"].includes(passenger.status),
+        canAccept: isOwner && passenger.status === "Pending",
+        canReject: isOwner && passenger.status === "Pending",
+        canCancel: (isOwner || 
+                   (passenger.user && (
+                     (currentUserId && passenger.user.publicId === currentUserId) || 
+                     (currentUserMongoId && (passenger.user._id === currentUserMongoId || passenger.user.id === currentUserMongoId))
+                   ))) && ["Pending", "Accepted"].includes(passenger.status),
       },
     })),
     permissions: {
-      canEdit: creator.publicId === currentUserId && !["Completed", "Cancelled"].includes(ride.status),
-      canDelete: creator.publicId === currentUserId,
-      canComplete: creator.publicId === currentUserId && ride.status !== "Completed" && ride.status !== "Cancelled",
+      canEdit: isOwner && !["Completed", "Cancelled"].includes(ride.status),
+      canDelete: isOwner,
+      canComplete: isOwner && !["Completed", "Cancelled"].includes(ride.status),
       hasBooked,
       canBook:
         Boolean(currentUserId) &&
-        creator.publicId !== currentUserId &&
+        !isOwner &&
         !["Completed", "Cancelled"].includes(ride.status) &&
         ride.availableSeats > 0 &&
         !hasBooked,

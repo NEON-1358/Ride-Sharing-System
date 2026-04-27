@@ -22,7 +22,7 @@ exports.getOverview = async (req, res) => {
 
   return res.json({
     users: users.map(toUserProfile),
-    rides: rides.map((ride) => toRideCard({ ...ride.toObject(), passengers: [] }, req.user.publicId)),
+    rides: rides.map((ride) => toRideCard({ ...ride.toObject(), passengers: [] }, req.user)),
     bookings: bookings.map(toBooking),
   });
 };
