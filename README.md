@@ -65,21 +65,25 @@ A modern, full-stack ride-sharing platform that connects drivers with passengers
 
 ```bash
 /
-├── src/                  # 🟢 Backend (Node.js/Express)
-│   ├── controllers-mongo/# Business Logic (Admin, Auth, Booking, Notification, Review, Ride, Verify)
-│   ├── models/           # Mongoose Schemas (User, Ride, Booking, Notification, Review)
-│   ├── routes/           # API Endpoints
-│   ├── middleware/       # Auth & Role-based Access Logic
-│   └── app.js            # Express Configuration
-├── public/               # 🔵 Frontend (React/Vite)
+├── client/              # � Frontend (React/Vite)
 │   ├── src/
-│   │   ├── components/   # Reusable UI (Header, ProtectedRoute)
-│   │   ├── pages/        # Dashboard, MyRides, CreateRide, Profile, Admin, etc.
-│   │   ├── context/      # Global State (AuthContext, ToastContext)
-│   │   └── style.css     # Global Styles & Animations
-│   └── index.html
-├── data/                 # Local Storage & Uploads
-└── server.js             # Backend Entry Point
+│   │   ├── components/  # Reusable UI (Header, ProtectedRoute)
+│   │   ├── pages/       # Dashboard, MyRides, CreateRide, Profile, Admin, etc.
+│   │   ├── context/     # Global State (AuthContext, ToastContext)
+│   │   └── style.css    # Global Styles & Animations
+│   └── package.json     # Frontend dependencies
+├── server/              # � Backend (Node.js/Express)
+│   ├── src/
+│   │   ├── controllers/ # Business Logic
+│   │   ├── models/      # Mongoose Schemas
+│   │   ├── routes/      # API Endpoints
+│   │   ├── config/      # Database & Passport config
+│   │   └── app.js       # Express Configuration
+│   ├── data/            # Local Uploads
+│   ├── server.js        # Backend Entry Point
+│   ├── package.json     # Backend dependencies
+│   └── .env             # Environment variables
+└── package.json         # Root (Monorepo management)
 ```
 
 ---
@@ -90,35 +94,21 @@ A modern, full-stack ride-sharing platform that connects drivers with passengers
 - [Node.js](https://nodejs.org/) (v16+)
 - [MongoDB](https://www.mongodb.com/) (Local or Atlas)
 
-### 1. Clone the Repository
+### 1. Setup
 ```bash
-git clone https://github.com/NKD-25/Ride-Sharing-System.git
-cd Ride-Sharing-System
+# Install dependencies for root, client, and server
+npm run install-all
 ```
 
-### 2. Backend Setup
+### 2. Run the Application
 ```bash
-# Install dependencies
-npm install
-
-# Configure Environment Variables (.env)
-PORT=3000
-MONGODB_URI=your_mongodb_connection_string
-JWT_SECRET=your_secret_key
-GOOGLE_CLIENT_ID=your_google_id
-GOOGLE_CLIENT_SECRET=your_google_secret
-
-# Start the server
+# Run both client and server concurrently
 npm run dev
-```
 
-### 3. Frontend Setup
-```bash
-cd public
-npm install
-npm run dev
+# Or run separately
+npm run server  # Backend only
+npm run client  # Frontend only
 ```
-Visit `http://localhost:5173` to start using the app!
 
 ---
 
