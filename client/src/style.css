@@ -391,8 +391,10 @@ h2, h3 { margin: 0; }
   justify-content: space-between;
 }
 
-.toast-error { background: #fee2e2; border-color: #fecaca; color: #991b1b; }
-.toast-success { background: #ecfdf5; border-color: #d1fae5; color: #065f46; }
+.toast-success { background-color: #059669; color: white; }
+.toast-error { background-color: #dc2626; color: white; }
+.toast-info { background-color: #2563eb; color: white; }
+.toast-warning { background-color: #d97706; color: white; }
 
 /* Chat Styles */
 .chat-overlay {

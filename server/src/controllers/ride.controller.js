@@ -162,7 +162,6 @@ exports.listRides = async (req, res) => {
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(booking);
     return map;
-    return map;
   }, new Map());
 
   return res.json({

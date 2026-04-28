@@ -13,8 +13,14 @@ exports.getChatHistory = async (req, res) => {
     if (!ride) return res.status(404).json({ message: "Ride not found" });
 
     // Only passenger or driver can see the chat
-    const isPassenger = String(booking.user) === String(req.user._id);
-    const isDriver = String(ride.creator) === String(req.user._id);
+    const userMongoId = String(req.user._id);
+    const userPublicId = String(req.user.publicId);
+    
+    const bookingUser = String(booking.user._id || booking.user);
+    const rideCreator = String(ride.creator._id || ride.creator);
+
+    const isPassenger = bookingUser === userMongoId || bookingUser === userPublicId;
+    const isDriver = rideCreator === userMongoId || rideCreator === userPublicId;
 
     if (!isPassenger && !isDriver) {
       return res.status(403).json({ message: "Not authorized to view this chat" });

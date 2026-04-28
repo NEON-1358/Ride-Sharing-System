@@ -43,6 +43,9 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
     s.on('connect', () => {
       console.log("Socket connected! ID:", s.id);
       console.log("Joining room:", bookingId);
+      console.log("Current User ID (publicId):", currentUserId);
+      console.log("Ride Owner ID (publicId):", ownerId);
+      console.log("Passenger ID (publicId):", riderId);
       s.emit('join', bookingId);
     });
 
@@ -69,7 +72,20 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
     if (!input.trim() || !socket) return;
 
     // Determine the receiver ID
-    const toId = currentUserId === ownerId ? riderId : ownerId;
+    const toId = String(currentUserId) === String(ownerId) ? riderId : ownerId;
+
+    console.log("DEBUG CHAT:", {
+      currentUserId,
+      ownerId,
+      riderId,
+      toId,
+      isOwner: currentUserId === ownerId
+    });
+
+    if (!toId) {
+      console.error("Cannot send message: Receiver ID (toId) is missing");
+      return;
+    }
 
     console.log("Sending message:", { room: bookingId, text: input, from: currentUserId, to: toId });
     socket.emit('message', {
@@ -82,12 +98,15 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
     setInput('');
   };
 
+  const isDriver = String(currentUserId) === String(ownerId);
+  const chatPartnerName = isDriver ? "Passenger" : (rideOwnerName || "Driver");
+
   return (
     <div className="chat-overlay">
       <div className="chat-box">
         <div className="chat-header">
           <div>
-            <h3 className="text-white">Chat with {currentUserId === ownerId ? 'Passenger' : rideOwnerName}</h3>
+            <h3 className="text-white">Chat with {chatPartnerName}</h3>
             <p className="text-xs opacity-75">Private Booking Chat</p>
           </div>
           <button className="close-chat" onClick={onClose}>&times;</button>

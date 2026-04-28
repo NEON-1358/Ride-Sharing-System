@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Header from "./components/Header";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuth } from "./context/AuthContext";
+import { useToast } from "./context/ToastContext";
+import { io } from "socket.io-client";
 import Admin from "./pages/Admin";
 import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
@@ -14,7 +16,26 @@ import Signup from "./pages/Signup";
 import "./style.css";
 
 export default function App() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, token } = useAuth();
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    if (!isAuthenticated || !token) return;
+
+    const socketUrl = `${window.location.protocol}//${window.location.hostname}:3000/chat`;
+    const socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      auth: { token }
+    });
+
+    socket.on('new_message_notification', (data) => {
+      // Don't show toast if we are already in a chat with this person
+      // This is a bit tricky to check globally, but we can at least show the notification
+      showToast(`New message from ${data.fromName}: ${data.text.substring(0, 30)}${data.text.length > 30 ? '...' : ''}`, 'info');
+    });
+
+    return () => socket.disconnect();
+  }, [isAuthenticated, token, showToast]);
 
   return (
     <>
