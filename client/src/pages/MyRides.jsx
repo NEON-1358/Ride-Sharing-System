@@ -168,7 +168,7 @@ export default function MyRides() {
                     {ride.passengers.map((p) => (
                       <div key={p.id} className="passenger-item">
                         <span>
-                          <Link to={`/profile/${p.user?.publicId}`} className="user-link">{p.user?.name}</Link>
+                          <Link to={`/profile/${p.user?.id}`} className="user-link">{p.user?.name}</Link>
                           {" "}({p.seats} seats) - <strong>{p.status}</strong>
                         </span>
                         <div className="passenger-actions">
@@ -191,6 +191,7 @@ export default function MyRides() {
           </div>
         </div>
 
+
         <div className="panel">
           <div className="panel-heading">
             <div>
@@ -211,7 +212,7 @@ export default function MyRides() {
                 </div>
                 <div className="ride-meta">
                   <span>{booking.seats} seat(s)</span>
-                  <span>Driver: <Link to={`/profile/${booking.ride?.creator?.publicId}`} className="user-link">{booking.ride?.creator?.name}</Link></span>
+                  <span>Driver: <Link to={`/profile/${booking.ride?.creator?.id}`} className="user-link">{booking.ride?.creator?.name}</Link></span>
                 </div>
                 <div className="ride-actions">
                   {["Pending", "Accepted", "Completed"].includes(booking.status) ? (

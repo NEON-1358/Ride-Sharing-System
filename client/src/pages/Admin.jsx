@@ -23,7 +23,7 @@ export default function Admin() {
         <div className="admin-grid">
           <div>
             <h2>Users</h2>
-            {data.users.map((user) => <div key={user.id} className="admin-row"><Link to={`/profile/${user.publicId}`} className="user-link">{user.name}</Link> • {user.email}</div>)}
+            {data.users.map((user) => <div key={user.id} className="admin-row"><Link to={`/profile/${user.id}`} className="user-link">{user.name}</Link> • {user.email}</div>)}
           </div>
           <div>
             <h2>Rides</h2>
@@ -31,7 +31,7 @@ export default function Admin() {
           </div>
           <div>
             <h2>Bookings</h2>
-            {data.bookings.map((booking) => <div key={booking.id} className="admin-row"><Link to={`/profile/${booking.user?.publicId}`} className="user-link">{booking.user?.name}</Link> • {booking.ride?.source} to {booking.ride?.destination} • {booking.status}</div>)}
+            {data.bookings.map((booking) => <div key={booking.id} className="admin-row"><Link to={`/profile/${booking.user?.id}`} className="user-link">{booking.user?.name}</Link> • {booking.ride?.source} to {booking.ride?.destination} • {booking.status}</div>)}
           </div>
         </div>
       </section>

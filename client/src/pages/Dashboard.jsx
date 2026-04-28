@@ -220,7 +220,7 @@ export default function Dashboard() {
                   <p className="ride-time">{new Date(ride.departureTime).toLocaleString()}</p>
                   <div className="ride-meta">
                     <span>{ride.availableSeats} seats • INR {ride.price}</span>
-                    <Link to={`/profile/${ride.creator?.publicId}`} className="user-link">{ride.creator?.name}</Link>
+                    <Link to={`/profile/${ride.creator?.id}`} className="user-link">{ride.creator?.name}</Link>
                   </div>
                 </div>
                 <button 

@@ -4,7 +4,6 @@ const Ride = require("../models/Ride");
 
 exports.getChatHistory = async (req, res) => {
   const { bookingId } = req.params;
-  const userId = req.user.id;
 
   try {
     const booking = await Booking.findOne({ publicId: bookingId });
@@ -14,11 +13,14 @@ exports.getChatHistory = async (req, res) => {
     if (!ride) return res.status(404).json({ message: "Ride not found" });
 
     // Only passenger or driver can see the chat
-    if (booking.user !== userId && ride.creator !== userId) {
+    const isPassenger = String(booking.user) === String(req.user._id);
+    const isDriver = String(ride.creator) === String(req.user._id);
+
+    if (!isPassenger && !isDriver) {
       return res.status(403).json({ message: "Not authorized to view this chat" });
     }
 
-    const messages = await Message.find({ rideId: bookingId }).sort({ createdAt: 1 });
+    const messages = await Message.find({ bookingId: bookingId }).sort({ createdAt: 1 });
     res.json(messages);
   } catch (error) {
     console.error("Chat history error:", error);

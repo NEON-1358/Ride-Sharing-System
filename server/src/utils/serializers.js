@@ -43,6 +43,15 @@ function toRideCard(ride, currentUser) {
            (currentUserMongoId && pMongoId === currentUserMongoId);
   });
 
+  const filteredPassengers = passengers.filter((passenger) => {
+    if (isOwner) return true;
+    const pUser = passenger.user || {};
+    const pPublicId = pUser.publicId || (typeof pUser === "string" ? pUser : null);
+    const pMongoId = pUser._id || pUser.id || (typeof pUser === "string" ? pUser : null);
+    return (currentUserId && pPublicId === currentUserId) || 
+           (currentUserMongoId && pMongoId === currentUserMongoId);
+  });
+
   return {
     id: ride.publicId,
     source: ride.source,
@@ -67,7 +76,7 @@ function toRideCard(ride, currentUser) {
         }
       : null,
     passengerCount: passengers.reduce((sum, passenger) => sum + Number(passenger.seats || 0), 0),
-    passengers: passengers.map((passenger) => ({
+    passengers: filteredPassengers.map((passenger) => ({
       id: passenger.publicId,
       seats: passenger.seats,
       status: passenger.status,

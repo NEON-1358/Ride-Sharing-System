@@ -14,16 +14,16 @@ export default function Profile() {
   const [name, setName] = useState("");
   const [profilePicture, setProfilePicture] = useState(null);
 
-  const isOwnProfile = !userId || userId === currentUser?.publicId;
+  const isOwnProfile = !userId || userId === currentUser?.id;
 
   useEffect(() => {
     async function fetchProfile() {
       setLoading(true);
       try {
-        if (isOwnProfile) {
+        if (isOwnProfile && currentUser) {
           setProfileData({ user: currentUser, reviews: currentReviews });
           setName(currentUser.name);
-        } else {
+        } else if (userId) {
           const data = await getProfile(userId);
           setProfileData(data);
           setName(data.user.name);
@@ -114,7 +114,7 @@ export default function Profile() {
           {reviews.map((review) => (
             <article key={review.id} className="review-item">
               <div className="review-row">
-                <Link to={`/profile/${review.reviewer?.publicId}`} className="user-link">
+                <Link to={`/profile/${review.reviewer?.id}`} className="user-link">
                   <strong>{review.reviewer?.name || "Passenger"}</strong>
                 </Link>
                 <span>{review.rating} / 5</span>

@@ -7,7 +7,7 @@ const MessageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: uuidv4,
     },
-    rideId: {
+    bookingId: {
       type: String,
       required: true,
       index: true,

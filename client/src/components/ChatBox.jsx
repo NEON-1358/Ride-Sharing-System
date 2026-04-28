@@ -4,14 +4,14 @@ import { useAuth } from '../context/AuthContext';
 import { getChatHistory } from '../utils/api';
 
 const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }) => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [socket, setSocket] = useState(null);
   const scrollRef = useRef();
 
   // Normalize IDs for comparison
-  const currentUserId = user?.publicId;
+  const currentUserId = user?.id;
   const ownerId = rideOwnerId;
   const riderId = passengerId;
 
@@ -34,7 +34,10 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
     const socketUrl = `${window.location.protocol}//${window.location.hostname}:3000/chat`;
     console.log("Connecting to socket:", socketUrl);
     const s = io(socketUrl, {
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      auth: {
+        token: token
+      }
     });
 
     s.on('connect', () => {
