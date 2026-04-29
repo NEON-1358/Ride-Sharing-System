@@ -35,33 +35,45 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
     console.log("Connecting to socket:", socketUrl);
     const s = io(socketUrl, {
       transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
       auth: {
         token: token
       }
     });
 
     s.on('connect', () => {
-      console.log("Socket connected! ID:", s.id);
-      console.log("Joining room:", bookingId);
-      console.log("Current User ID (publicId):", currentUserId);
-      console.log("Ride Owner ID (publicId):", ownerId);
-      console.log("Passenger ID (publicId):", riderId);
+      console.log("SUCCESS: Socket connected! ID:", s.id);
+      console.log("ACTION: Joining room:", bookingId);
       s.emit('join', bookingId);
     });
 
+    s.on('joined', (data) => {
+      console.log("SUCCESS: Joined room successfully:", data);
+    });
+
+    s.on('user_joined', (data) => {
+      console.log("INFO: Another user joined the room:", data);
+    });
+
     s.on('connect_error', (err) => {
-      console.error("Socket connection error:", err);
+      console.error("ERROR: Socket connection error:", err.message);
+    });
+
+    s.on('error', (err) => {
+      console.error("ERROR: Socket error:", err);
     });
 
     s.on('message', (msg) => {
-      console.log("Received message:", msg);
+      console.log("SUCCESS: Received message:", msg);
       setMessages((prev) => [...prev, msg]);
     });
 
     setSocket(s);
 
     return () => s.disconnect();
-  }, [bookingId]);
+  }, [bookingId, token]);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -74,12 +86,13 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
     // Determine the receiver ID
     const toId = String(currentUserId) === String(ownerId) ? riderId : ownerId;
 
-    console.log("DEBUG CHAT:", {
+    console.log("SENDING DEBUG:", {
       currentUserId,
       ownerId,
       riderId,
       toId,
-      isOwner: currentUserId === ownerId
+      room: bookingId,
+      text: input
     });
 
     if (!toId) {
@@ -121,7 +134,7 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
           {messages.map((msg, i) => (
             <div 
               key={i} 
-              className={`msg ${msg.from === currentUserId ? 'msg-sent' : 'msg-received'}`}
+              className={`msg ${String(msg.from) === String(currentUserId) ? 'msg-sent' : 'msg-received'}`}
             >
               <div className="text-[10px] opacity-70 mb-1">{msg.fromName}</div>
               {msg.text}

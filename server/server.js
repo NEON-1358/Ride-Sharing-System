@@ -11,7 +11,13 @@ const PORT = process.env.PORT || 3000;
 const secret = process.env.JWT_SECRET || "secretkey";
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+const io = new Server(server, { 
+  cors: { 
+    origin: "*",
+    methods: ["GET", "POST"]
+  },
+  transports: ['websocket', 'polling']
+});
 
 // Authentication middleware for Socket.io
 io.of("/chat").use(async (socket, next) => {
@@ -27,30 +33,38 @@ io.of("/chat").use(async (socket, next) => {
       return next(new Error("Authentication error: User not found"));
     }
     socket.user = user;
-        // Join a private room for global notifications
-        socket.join(`user_${user.publicId}`);
-        console.log(`User ${user.name} joined global notification room: user_${user.publicId}`);
-        next();
-      } catch (err) {
+    next();
+  } catch (err) {
     next(new Error("Authentication error: Invalid token"));
   }
 });
 
 io.of("/chat").on("connection", socket => {
   console.log("User connected to /chat namespace:", socket.user.name);
+  
+  // Join a private room for global notifications
+  socket.join(`user_${socket.user.publicId}`);
+  console.log(`User ${socket.user.name} joined global notification room: user_${socket.user.publicId}`);
 
   socket.on("join", async (room) => {
-    if (!room) return;
-    console.log(`Socket ${socket.id} (${socket.user.name}) attempting to join room: ${room}`);
+    if (!room) {
+      console.warn("Join failed: No room ID provided");
+      return;
+    }
+    const roomStr = String(room);
+    console.log(`Socket ${socket.id} (${socket.user.name}) attempting to join room: ${roomStr}`);
 
     try {
-      const booking = await Booking.findOne({ publicId: room }).populate('ride');
+      // Find booking by publicId or _id for robustness
+      const booking = await Booking.findOne({ 
+        $or: [{ publicId: roomStr }, { _id: roomStr }] 
+      }).populate('ride');
+
       if (!booking) {
-        console.warn(`Join failed: Booking ${room} not found`);
+        console.warn(`Join failed: Booking ${roomStr} not found in database`);
         return;
       }
 
-      // Both booking.user and booking.ride.creator should be compared against both _id and publicId for robustness
       const userMongoId = String(socket.user._id);
       const userPublicId = String(socket.user.publicId);
 
@@ -61,12 +75,19 @@ io.of("/chat").on("connection", socket => {
       const isDriver = rideCreator && (rideCreator === userMongoId || rideCreator === userPublicId);
 
       if (isPassenger || isDriver) {
-        socket.join(String(room));
-        console.log(`Socket ${socket.id} joined room: ${room} as ${isDriver ? 'Driver' : 'Passenger'}`);
+        socket.join(roomStr);
+        console.log(`SUCCESS: Socket ${socket.id} joined room: ${roomStr} as ${isDriver ? 'Driver' : 'Passenger'}`);
+        
+        // Broadcast to everyone in the room that someone joined
+        io.of("/chat").to(roomStr).emit("user_joined", { 
+          user: socket.user.name,
+          role: isDriver ? 'driver' : 'passenger'
+        });
+
+        socket.emit("joined", { room: roomStr, role: isDriver ? 'driver' : 'passenger' });
       } else {
-        console.warn(`Join denied: User ${socket.user.name} is not authorized for booking ${room}`);
-        console.log(`User IDs: _id=${userMongoId}, publicId=${userPublicId}`);
-        console.log(`Booking User: ${bookingUser}, Ride Creator: ${rideCreator}`);
+        console.warn(`Join DENIED: User ${socket.user.name} is not authorized for booking ${roomStr}`);
+        console.log(`DEBUG AUTH: UserMongo=${userMongoId}, UserPublic=${userPublicId}, BookingUser=${bookingUser}, RideCreator=${rideCreator}`);
       }
     } catch (err) {
       console.error("Join room error:", err);
@@ -79,38 +100,75 @@ io.of("/chat").on("connection", socket => {
       return;
     }
 
-    console.log(`Message in room ${room} from ${fromName} (ID: ${from}) to (ID: ${to}): ${text}`);
+    const roomStr = String(room);
+    
+    // Security: Verify the sender is authorized for this room
+    // Instead of just checking socket.rooms, let's log the status and allow if they should be there
+    if (!socket.rooms.has(roomStr)) {
+      console.log(`Socket ${socket.id} not in room ${roomStr}. Current rooms:`, Array.from(socket.rooms));
+      
+      // Auto-join if they are authorized (to handle reconnection edge cases)
+      try {
+        const booking = await Booking.findOne({ 
+          $or: [{ publicId: roomStr }, { _id: roomStr }] 
+        }).populate('ride');
+
+        if (booking) {
+          const userMongoId = String(socket.user._id);
+          const userPublicId = String(socket.user.publicId);
+          const bookingUser = String(booking.user._id || booking.user);
+          const rideCreator = booking.ride ? String(booking.ride.creator._id || booking.ride.creator) : null;
+
+          if (bookingUser === userMongoId || bookingUser === userPublicId || 
+              (rideCreator && (rideCreator === userMongoId || rideCreator === userPublicId))) {
+            socket.join(roomStr);
+            console.log(`Auto-joined socket ${socket.id} to room ${roomStr} during message send`);
+          } else {
+            console.warn(`Unauthorized message: User ${socket.user.name} not part of booking ${roomStr}`);
+            return;
+          }
+        } else {
+          console.warn(`Unauthorized message: Booking ${roomStr} not found`);
+          return;
+        }
+      } catch (err) {
+        console.error("Authorization check error:", err);
+        return;
+      }
+    }
+
+    console.log(`Message in room ${roomStr} from ${fromName} (ID: ${from}) to (ID: ${to}): ${text}`);
 
     try {
       // Save to database
       const msg = new Message({
-        bookingId: String(room),
+        bookingId: roomStr,
         senderId: String(from),
         senderName: String(fromName || "User"),
         receiverId: String(to),
         text: String(text)
       });
       await msg.save();
-      console.log(`Message saved to DB for room ${room}`);
       
-      // Broadcast to everyone in the room (including sender)
-      io.of("/chat").to(String(room)).emit("message", { 
+      const messageData = { 
         text: String(text), 
         from: String(from), 
         fromName: String(fromName || "User"),
         ts: Date.now() 
-      });
+      };
+
+      // Broadcast to EVERYONE in the room including the sender
+      io.of("/chat").to(roomStr).emit("message", messageData);
       
-      console.log(`Message broadcasted to room ${room}. Total clients in room: ${io.of("/chat").adapter.rooms.get(String(room))?.size || 0}`);
+      console.log(`Message broadcasted to room ${roomStr}. Total clients in room: ${io.of("/chat").adapter.rooms.get(roomStr)?.size || 0}`);
 
       // Also send a global notification to the receiver's private room
       io.of("/chat").to(`user_${to}`).emit("new_message_notification", {
-        bookingId: String(room),
+        bookingId: roomStr,
         text: String(text),
         fromName: String(fromName || "User"),
         fromId: String(from)
       });
-      console.log(`Notification sent to user_${to}`);
     } catch (err) {
       console.error("Message handling error:", err);
     }
