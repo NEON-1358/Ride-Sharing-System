@@ -34,6 +34,15 @@ export default function MyRides() {
   function updateField(event) {
     const { name, value } = event.target;
     setRideForm((current) => ({ ...current, [name]: value }));
+
+    // Price Suggestion Logic
+    if (name === "source" || name === "destination") {
+      // Very basic mock suggestion: 5 rupees per km (assuming average city distance if inputs are non-empty)
+      if (rideForm.source && rideForm.destination) {
+        const suggestedPrice = Math.floor(Math.random() * (500 - 200) + 200); // Mock range
+        // We could show this as a hint rather than auto-filling
+      }
+    }
   }
 
   async function handleCreateRide(event) {
@@ -131,7 +140,7 @@ export default function MyRides() {
           </div>
           <div className="input-group">
             <input name="price" type="number" min="0" value={rideForm.price} onChange={updateField} required />
-            <small className="muted-text">Price per seat</small>
+            <small className="muted-text">Price per seat (Recommended: ₹250 - ₹500)</small>
           </div>
           <input name="description" placeholder="Description" value={rideForm.description} onChange={updateField} />
           <button type="submit" className="solid-button">Publish ride</button>

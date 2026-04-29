@@ -76,4 +76,9 @@ const RideSchema = new mongoose.Schema(
 
 RideSchema.index({ source: "text", destination: "text", description: "text" });
 
+// Compound index for efficient searching on dashboard
+RideSchema.index({ status: 1, departureTime: 1, availableSeats: 1 });
+// Index for source/destination searches (partial text matching)
+RideSchema.index({ source: 1, destination: 1 });
+
 module.exports = mongoose.model("Ride", RideSchema);

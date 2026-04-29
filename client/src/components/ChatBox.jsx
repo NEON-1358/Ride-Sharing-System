@@ -8,7 +8,10 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [socket, setSocket] = useState(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [partnerTyping, setPartnerTyping] = useState(null);
   const scrollRef = useRef();
+  const typingTimeoutRef = useRef(null);
 
   // Normalize IDs for comparison
   const currentUserId = user?.id;
@@ -68,6 +71,19 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
     s.on('message', (msg) => {
       console.log("SUCCESS: Received message:", msg);
       setMessages((prev) => [...prev, msg]);
+      setPartnerTyping(null); // Clear typing status when message arrives
+    });
+
+    s.on('typing', (data) => {
+      if (String(data.from) !== String(currentUserId)) {
+        setPartnerTyping(data.fromName);
+      }
+    });
+
+    s.on('stop_typing', (data) => {
+      if (String(data.from) !== String(currentUserId)) {
+        setPartnerTyping(null);
+      }
     });
 
     setSocket(s);
@@ -79,9 +95,33 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setInput(val);
+
+    if (!socket) return;
+
+    if (!isTyping) {
+      setIsTyping(true);
+      socket.emit('typing', { room: bookingId, from: currentUserId, fromName: user.name });
+    }
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+      socket.emit('stop_typing', { room: bookingId, from: currentUserId });
+    }, 2000);
+  };
+
   const handleSend = (e) => {
     e.preventDefault();
     if (!input.trim() || !socket) return;
+
+    // Clear typing indicator immediately
+    setIsTyping(false);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    socket.emit('stop_typing', { room: bookingId, from: currentUserId });
 
     // Determine the receiver ID
     const toId = String(currentUserId) === String(ownerId) ? riderId : ownerId;
@@ -140,6 +180,14 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
               {msg.text}
             </div>
           ))}
+          {partnerTyping && (
+            <div className="msg msg-received !bg-transparent !border-none !py-1 !px-0">
+              <div className="typing-indicator">
+                <span></span><span></span><span></span>
+              </div>
+              <small className="opacity-50 text-[10px] ml-1">{partnerTyping} is typing...</small>
+            </div>
+          )}
           <div ref={scrollRef} />
         </div>
 
@@ -147,7 +195,7 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
           <input
             type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             placeholder="Type a message..."
             className="flex-1"
           />

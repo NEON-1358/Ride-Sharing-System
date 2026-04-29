@@ -97,4 +97,7 @@ const UserSchema = new mongoose.Schema(
   { timestamps: true, strict: false }
 );
 
+UserSchema.index({ email: 1 });
+UserSchema.index({ googleId: 1 });
+
 module.exports = mongoose.model("User", UserSchema);

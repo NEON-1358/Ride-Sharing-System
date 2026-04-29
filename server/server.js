@@ -103,7 +103,6 @@ io.of("/chat").on("connection", socket => {
     const roomStr = String(room);
     
     // Security: Verify the sender is authorized for this room
-    // Instead of just checking socket.rooms, let's log the status and allow if they should be there
     if (!socket.rooms.has(roomStr)) {
       console.log(`Socket ${socket.id} not in room ${roomStr}. Current rooms:`, Array.from(socket.rooms));
       
@@ -160,6 +159,9 @@ io.of("/chat").on("connection", socket => {
       // Broadcast to EVERYONE in the room including the sender
       io.of("/chat").to(roomStr).emit("message", messageData);
       
+      // Stop typing indicator when message is sent
+      socket.to(roomStr).emit("stop_typing", { from: String(from) });
+      
       console.log(`Message broadcasted to room ${roomStr}. Total clients in room: ${io.of("/chat").adapter.rooms.get(roomStr)?.size || 0}`);
 
       // Also send a global notification to the receiver's private room
@@ -172,6 +174,14 @@ io.of("/chat").on("connection", socket => {
     } catch (err) {
       console.error("Message handling error:", err);
     }
+  });
+
+  socket.on("typing", ({ room, from, fromName }) => {
+    socket.to(String(room)).emit("typing", { from, fromName });
+  });
+
+  socket.on("stop_typing", ({ room, from }) => {
+    socket.to(String(room)).emit("stop_typing", { from });
   });
 
   socket.on("disconnect", () => {

@@ -2,6 +2,7 @@ const express = require("express");
 const path = require("path");
 const cors = require("cors");
 const session = require("express-session");
+const rateLimit = require("express-rate-limit");
 require("dotenv").config();
 const { connectMongo } = require("./config/db");
 const passport = require("./config/passport");
@@ -16,6 +17,28 @@ const verifyRoutes = require("./routes/verify.routes");
 const chatRoutes = require("./routes/chat.routes");
 
 const app = express();
+
+// Global Rate Limiting
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: { message: "Too many requests from this IP, please try again after 15 minutes" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Stricter limiter for Auth routes
+const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // Limit each IP to 10 requests per hour for login/signup
+  message: { message: "Too many authentication attempts, please try again after an hour" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use("/api/", globalLimiter);
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/signup", authLimiter);
 
 app.use(
   cors({
