@@ -496,6 +496,39 @@ h2, h3 { margin: 0; }
   40% { transform: translateY(-5px); }
 }
 
+/* Location Suggestions Dropdown */
+.relative { 
+  position: relative; 
+  width: 100%;
+  z-index: 10;
+}
+.suggestions-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  z-index: 1000;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+.suggestion-item {
+  padding: 0.8rem 1rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.suggestion-item:last-child { border-bottom: none; }
+.suggestion-item:hover { background: #f8f8f8; }
+
 @keyframes slideIn {
   from {
     transform: translateX(100%);
@@ -515,6 +548,54 @@ h2, h3 { margin: 0; }
   min-height: calc(100vh - 96px);
 }
 .auth-panel { width: min(520px, 100%); display: grid; gap: 1rem; }
+
+/* Password Input with Eye Icon */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.password-input-wrapper input {
+  padding-right: 3rem;
+}
+.password-toggle {
+  position: absolute;
+  right: 1rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem;
+  font-size: 1.2rem;
+  transition: color 0.2s;
+}
+.password-toggle:hover {
+  color: var(--page-ink);
+}
+
+/* Google Button with Logo */
+.google-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: white !important;
+  color: #374151 !important;
+  border: 1px solid #d1d5db !important;
+  font-weight: 500 !important;
+  transition: background-color 0.2s, box-shadow 0.2s !important;
+}
+.google-button:hover {
+  background-color: #f9fafb !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+}
+.google-logo {
+  width: 18px;
+  height: 18px;
+}
 .profile-summary { text-align: center; }
 .avatar-wrap { display: flex; justify-content: center; margin-bottom: 1rem; }
 .avatar-image, .avatar-fallback { width: 112px; height: 112px; border-radius: 28px; }

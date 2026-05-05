@@ -11,6 +11,8 @@ const createRideState = {
   totalSeats: 1,
   price: 0,
   description: "",
+  sourceCoords: null,
+  destinationCoords: null,
 };
 
 export default function MyRides() {
@@ -20,6 +22,33 @@ export default function MyRides() {
   const [myBookings, setMyBookings] = useState([]);
   const [reviewDrafts, setReviewDrafts] = useState({});
   const [activeChat, setActiveChat] = useState(null);
+  const [suggestions, setSuggestions] = useState({ source: [], destination: [] });
+  const [loadingSuggestions, setLoadingSuggestions] = useState({ source: false, destination: false });
+  const [isValidating, setIsValidating] = useState(false);
+
+  async function fetchSuggestions(query, type) {
+    if (!query || query.trim().length < 3) {
+      setSuggestions(prev => ({ ...prev, [type]: [] }));
+      return;
+    }
+
+    setLoadingSuggestions(prev => ({ ...prev, [type]: true }));
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`);
+      if (!response.ok) throw new Error("Network response was not ok");
+      const data = await response.json();
+      
+      // Ensure data is an array
+      if (Array.isArray(data)) {
+        setSuggestions(prev => ({ ...prev, [type]: data }));
+      }
+    } catch (error) {
+      console.error("Suggestions error:", error);
+      setSuggestions(prev => ({ ...prev, [type]: [] }));
+    } finally {
+      setLoadingSuggestions(prev => ({ ...prev, [type]: false }));
+    }
+  }
 
   async function loadData() {
     const [ridesResponse, bookingsResponse] = await Promise.all([listRides({ mine: true, limit: 20 }), listMyBookings()]);
@@ -35,6 +64,11 @@ export default function MyRides() {
     const { name, value } = event.target;
     setRideForm((current) => ({ ...current, [name]: value }));
 
+    // Real-time suggestions for source and destination
+    if (name === "source" || name === "destination") {
+      fetchSuggestions(value, name);
+    }
+
     // Price Suggestion Logic
     if (name === "source" || name === "destination") {
       // Very basic mock suggestion: 5 rupees per km (assuming average city distance if inputs are non-empty)
@@ -45,21 +79,92 @@ export default function MyRides() {
     }
   }
 
+  useEffect(() => {
+    let watchId = null;
+    const inProgressRides = myRides.filter(r => r.status === "In Progress");
+
+    if (inProgressRides.length > 0 && navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          inProgressRides.forEach(ride => {
+            updateRideLocation(ride.id, latitude, longitude).catch(err => console.error("Location sync error:", err));
+          });
+        },
+        (error) => console.error("Geolocation error:", error),
+        { enableHighAccuracy: true, distanceFilter: 50 } // Update every 50 meters
+      );
+    }
+
+    return () => {
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+    };
+  }, [myRides]);
+
   async function handleCreateRide(event) {
     event.preventDefault();
+    if (isValidating) return;
+
+    // Frontend Validations
+    const now = new Date();
+    const departureDate = new Date(rideForm.departureTime);
+
+    if (departureDate <= now) {
+      return showToast("Departure time must be in the future.", "error");
+    }
+
+    if (rideForm.source.trim().length < 3 || rideForm.destination.trim().length < 3) {
+      return showToast("Source and destination must be at least 3 characters.", "error");
+    }
+
+    // Verify locations exist in the real world
+    setIsValidating(true);
+    showToast("Verifying locations with map...", "info");
+    try {
+      const [srcRes, destRes] = await Promise.all([
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(rideForm.source)}&limit=1`),
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(rideForm.destination)}&limit=1`)
+      ]);
+      const [srcData, destData] = await Promise.all([srcRes.json(), destRes.json()]);
+
+      if (!srcData || srcData.length === 0) {
+        setIsValidating(false);
+        return showToast(`Location not found: '${rideForm.source}'. Please select a real address from the suggestions.`, "error");
+      }
+      if (!destData || destData.length === 0) {
+        setIsValidating(false);
+        return showToast(`Location not found: '${rideForm.destination}'. Please select a real address from the suggestions.`, "error");
+      }
+    } catch (err) {
+      console.error("Verification error:", err);
+      // Fallback: if geocoding is down, we let the server try to handle it
+    }
+
+    if (rideForm.source.toLowerCase() === rideForm.destination.toLowerCase()) {
+      setIsValidating(false);
+      return showToast("Source and destination cannot be the same.", "error");
+    }
+
+    if (Number(rideForm.price) < 50) {
+      setIsValidating(false);
+      return showToast("Minimum price per seat is ₹50.", "error");
+    }
+
     try {
       await createRide(rideForm);
       setRideForm(createRideState);
-      showToast("Ride created successfully.");
+      showToast("Ride published successfully!");
       await loadData();
     } catch (error) {
       showToast(error.message, 'error');
+    } finally {
+      setIsValidating(false);
     }
   }
 
   async function changeRideStatus(rideId, status) {
     try {
-      await updateRideStatus(rideId, { status });
+      await updateRideStatus(rideId, status);
       showToast(`Ride marked as ${status}.`);
       await loadData();
     } catch (error) {
@@ -121,6 +226,16 @@ export default function MyRides() {
     }
   }
 
+  function handleSelectSuggestion(suggestion, type) {
+    const coords = [parseFloat(suggestion.lon), parseFloat(suggestion.lat)];
+    setRideForm(prev => ({ 
+      ...prev, 
+      [type]: suggestion.display_name,
+      [`${type}Coords`]: coords
+    }));
+    setSuggestions(prev => ({ ...prev, [type]: [] }));
+  }
+
   return (
     <div className="page-shell">
       <section className="panel">
@@ -131,8 +246,38 @@ export default function MyRides() {
           </div>
         </div>
         <form className="filter-grid" onSubmit={handleCreateRide}>
-          <input name="source" placeholder="Source" value={rideForm.source} onChange={updateField} required />
-          <input name="destination" placeholder="Destination" value={rideForm.destination} onChange={updateField} required />
+          <div className="relative">
+            <input name="source" placeholder="Source" value={rideForm.source} onChange={updateField} required autoComplete="off" />
+            {(suggestions.source.length > 0 || loadingSuggestions.source) && (
+              <div className="suggestions-dropdown">
+                {loadingSuggestions.source ? (
+                  <div className="suggestion-item opacity-50">Searching...</div>
+                ) : (
+                  suggestions.source.map((s, i) => (
+                    <div key={i} className="suggestion-item" onClick={() => handleSelectSuggestion(s, 'source')}>
+                      {s.display_name}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+          <div className="relative">
+            <input name="destination" placeholder="Destination" value={rideForm.destination} onChange={updateField} required autoComplete="off" />
+            {(suggestions.destination.length > 0 || loadingSuggestions.destination) && (
+              <div className="suggestions-dropdown">
+                {loadingSuggestions.destination ? (
+                  <div className="suggestion-item opacity-50">Searching...</div>
+                ) : (
+                  suggestions.destination.map((s, i) => (
+                    <div key={i} className="suggestion-item" onClick={() => handleSelectSuggestion(s, 'destination')}>
+                      {s.display_name}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
           <input name="departureTime" type="datetime-local" value={rideForm.departureTime} onChange={updateField} required />
           <div className="input-group">
             <input name="totalSeats" type="number" min="1" value={rideForm.totalSeats} onChange={updateField} required />
@@ -143,7 +288,9 @@ export default function MyRides() {
             <small className="muted-text">Price per seat (Recommended: ₹250 - ₹500)</small>
           </div>
           <input name="description" placeholder="Description" value={rideForm.description} onChange={updateField} />
-          <button type="submit" className="solid-button">Publish ride</button>
+          <button type="submit" className="solid-button" disabled={isValidating}>
+            {isValidating ? "Verifying..." : "Publish ride"}
+          </button>
         </form>
       </section>
 
@@ -184,15 +331,28 @@ export default function MyRides() {
                           {p.permissions?.canAccept && <button type="button" className="ghost-button" onClick={() => handleAcceptBooking(p.id)}>Accept</button>}
                           {p.permissions?.canReject && <button type="button" className="ghost-button" onClick={() => handleRejectBooking(p.id)}>Reject</button>}
                           {p.permissions?.canCancel && <button type="button" className="ghost-button" onClick={() => handleCancelBooking(p.id)}>Cancel</button>}
-                          <button type="button" className="ghost-button" onClick={() => setActiveChat({ id: p.id, ownerId: ride.creator?.id, ownerName: ride.creator?.name, passengerId: p.user?.id })}>Chat</button>
+                          <button type="button" className="ghost-button" onClick={() => {
+                            console.log("DRIVER CHAT OPEN:", {
+                              bookingId: p.id,
+                              ownerId: ride.creator?.id,
+                              passengerId: p.user?.id
+                            });
+                            setActiveChat({ 
+                              id: p.id, 
+                              ownerId: ride.creator?.id, 
+                              ownerName: ride.creator?.name, 
+                              passengerId: p.user?.id 
+                            });
+                          }}>Chat</button>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
                 <div className="ride-actions">
-                  {ride.permissions.canComplete ? <button type="button" className="solid-button" onClick={() => changeRideStatus(ride.id, "Completed")}>Mark completed</button> : null}
-                  {ride.status !== "Cancelled" ? <button type="button" className="ghost-button" onClick={() => changeRideStatus(ride.id, "Cancelled")}>Cancel ride</button> : null}
+                  {ride.permissions.canStart ? <button type="button" className="solid-button" onClick={() => changeRideStatus(ride.id, "In Progress")}>Start trip</button> : null}
+                  {ride.permissions.canComplete ? <button type="button" className="solid-button" onClick={() => changeRideStatus(ride.id, "Completed")}>End trip & Complete</button> : null}
+                  {!["Completed", "Cancelled"].includes(ride.status) ? <button type="button" className="ghost-button" onClick={() => changeRideStatus(ride.id, "Cancelled")}>Cancel ride</button> : null}
                   <button type="button" className="ghost-button" onClick={() => handleDeleteRide(ride.id)}>Delete</button>
                 </div>
               </article>
@@ -221,6 +381,9 @@ export default function MyRides() {
                 </div>
                 <div className="ride-meta">
                   <span>{booking.seats} seat(s)</span>
+                  {booking.status === "Completed" && (
+                    <span className="accent-text">Fare: ₹{booking.finalFare} ({booking.paymentStatus})</span>
+                  )}
                   <span>Driver: <Link to={`/profile/${booking.ride?.creator?.id}`} className="user-link">{booking.ride?.creator?.name}</Link></span>
                 </div>
                 <div className="ride-actions">

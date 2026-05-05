@@ -5,8 +5,13 @@ const { createNotification } = require("../utils/notifications");
 const { toBooking } = require("../utils/serializers");
 
 const bookingSchema = Joi.object({
-  rideId: Joi.string().trim().required(),
-  seats: Joi.number().integer().min(1).max(6).required(),
+  rideId: Joi.string().trim().required().messages({
+    'any.required': 'Ride ID is required'
+  }),
+  seats: Joi.number().integer().min(1).max(8).required().messages({
+    'number.min': 'You must book at least 1 seat',
+    'number.max': 'You cannot book more than 8 seats'
+  }),
 });
 
 exports.createBooking = async (req, res) => {

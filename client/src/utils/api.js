@@ -1,4 +1,10 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+const getApiBase = () => {
+  if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL;
+  // Fallback to current hostname but on port 3000
+  return `${window.location.protocol}//${window.location.hostname}:3000/api`;
+};
+
+const API_BASE = getApiBase();
 const TOKEN_KEY = "rideshare_token";
 
 export function getToken() {
@@ -88,8 +94,18 @@ export function updateRide(rideId, payload) {
   return request(`/rides/${rideId}`, { method: "PATCH", body: JSON.stringify(payload) });
 }
 
-export function updateRideStatus(rideId, payload) {
-  return request(`/rides/${rideId}/status`, { method: "PATCH", body: JSON.stringify(payload) });
+export function updateRideStatus(rideId, status, cancelledReason) {
+  return request(`/rides/${rideId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, cancelledReason }),
+  });
+}
+
+export function updateRideLocation(rideId, lat, lon) {
+  return request(`/rides/${rideId}/location`, {
+    method: "PATCH",
+    body: JSON.stringify({ lat, lon }),
+  });
 }
 
 export function deleteRide(rideId) {

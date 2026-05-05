@@ -6,12 +6,29 @@ const { createNotification } = require("../utils/notifications");
 const { toRideCard } = require("../utils/serializers");
 
 const rideSchema = Joi.object({
-  source: Joi.string().trim().min(2).max(80).required(),
-  destination: Joi.string().trim().min(2).max(80).required(),
-  departureTime: Joi.date().iso().greater("now").required(),
-  totalSeats: Joi.number().integer().min(1).max(10).required(),
-  price: Joi.number().min(0).required(),
+  source: Joi.string().trim().min(3).max(100).required().messages({
+    'string.min': 'Source location must be at least 3 characters long',
+    'any.required': 'Source location is required'
+  }),
+  destination: Joi.string().trim().min(3).max(100).required().messages({
+    'string.min': 'Destination location must be at least 3 characters long',
+    'any.required': 'Destination location is required'
+  }),
+  departureTime: Joi.date().iso().greater("now").required().messages({
+    'date.greater': 'Departure time must be in the future',
+    'any.required': 'Departure time is required'
+  }),
+  totalSeats: Joi.number().integer().min(1).max(8).required().messages({
+    'number.min': 'At least 1 seat must be offered',
+    'number.max': 'You cannot offer more than 8 seats in a standard ride'
+  }),
+  price: Joi.number().min(50).max(5000).required().messages({
+    'number.min': 'Price must be at least ₹50',
+    'number.max': 'Price cannot exceed ₹5000'
+  }),
   description: Joi.string().trim().max(300).allow("").optional(),
+  sourceCoords: Joi.array().items(Joi.number()).length(2).optional(),
+  destinationCoords: Joi.array().items(Joi.number()).length(2).optional(),
 });
 
 const rideUpdateSchema = Joi.object({
@@ -46,8 +63,17 @@ async function processCompletion(ride) {
   const bookings = await Booking.find({ ride: ride._id, status: "Accepted" });
   const userSeatCounts = new Map();
 
+  // Fare Calculation & Payment Simulation
+  const basePrice = ride.price;
+  const surgeMultiplier = Math.random() * (1.5 - 1.0) + 1.0; // Random surge between 1.0x and 1.5x
+  
   for (const booking of bookings) {
+    // Calculate final fare: (Base Price * Seats) * Surge
+    const calculatedFare = Math.round((basePrice * booking.seats) * surgeMultiplier);
+    
     booking.status = "Completed";
+    booking.finalFare = calculatedFare;
+    booking.paymentStatus = "Paid"; // Simulate successful payment
     await booking.save();
 
     const previous = userSeatCounts.get(String(booking.user)) || 0;
@@ -204,6 +230,17 @@ exports.getRide = async (req, res) => {
   );
 };
 
+async function verifyLocation(name) {
+  try {
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(name)}&limit=1`);
+    const data = await response.json();
+    return data && data.length > 0;
+  } catch (err) {
+    console.error("Geocoding verification error:", err);
+    return true; // Fallback to true if API is down to avoid blocking users
+  }
+}
+
 exports.createRide = async (req, res, next) => {
   try {
     const { error, value } = rideSchema.validate(req.body);
@@ -211,10 +248,26 @@ exports.createRide = async (req, res, next) => {
       return res.status(400).json({ message: error.details[0].message });
     }
 
+    // Strict Backend verification of locations
+    const [isSourceValid, isDestValid] = await Promise.all([
+      verifyLocation(value.source),
+      verifyLocation(value.destination)
+    ]);
+
+    if (!isSourceValid) {
+      return res.status(400).json({ message: `The location '${value.source}' could not be verified on the map. Please use a real address.` });
+    }
+    if (!isDestValid) {
+      return res.status(400).json({ message: `The location '${value.destination}' could not be verified on the map. Please use a real address.` });
+    }
+
     const ride = await Ride.create({
       ...value,
       availableSeats: value.totalSeats,
       creator: req.user._id,
+      sourceCoords: value.sourceCoords ? { type: "Point", coordinates: value.sourceCoords } : undefined,
+      destinationCoords: value.destinationCoords ? { type: "Point", coordinates: value.destinationCoords } : undefined,
+      currentLocation: value.sourceCoords ? { type: "Point", coordinates: value.sourceCoords } : undefined,
     });
 
     const populatedRide = await loadRideForOutput(ride._id, req.user.publicId);
@@ -274,6 +327,32 @@ exports.updateRide = async (req, res) => {
   return res.json(await loadRideForOutput(ride._id, req.user.publicId));
 };
 
+exports.updateRideLocation = async (req, res) => {
+  const { lat, lon } = req.body;
+  if (lat === undefined || lon === undefined) {
+    return res.status(400).json({ message: "Latitude and longitude are required." });
+  }
+
+  const ride = await Ride.findOne({ publicId: req.params.rideId });
+  if (!ride) {
+    return res.status(404).json({ message: "Ride not found." });
+  }
+
+  const rideCreatorId = ride.creator?._id || ride.creator;
+  if (String(rideCreatorId) !== String(req.user._id)) {
+    return res.status(403).json({ message: "Only the ride creator can update the location." });
+  }
+
+  if (ride.status !== "In Progress") {
+    return res.status(400).json({ message: "Location can only be updated while the ride is In Progress." });
+  }
+
+  ride.currentLocation = { type: "Point", coordinates: [parseFloat(lon), parseFloat(lat)] };
+  await ride.save();
+
+  return res.json({ message: "Location updated successfully." });
+};
+
 exports.deleteRide = async (req, res) => {
   const ride = await Ride.findOne({ publicId: req.params.rideId });
   if (!ride) {
@@ -300,7 +379,7 @@ exports.updateRideStatus = async (req, res) => {
   const status = req.body.status;
   const cancelledReason = typeof req.body.cancelledReason === "string" ? req.body.cancelledReason.trim() : "";
 
-  if (!["Open", "Confirmed", "Completed", "Cancelled"].includes(status)) {
+  if (!["Open", "Confirmed", "In Progress", "Completed", "Cancelled"].includes(status)) {
     return res.status(400).json({ message: "Invalid ride status." });
   }
 
@@ -314,10 +393,55 @@ exports.updateRideStatus = async (req, res) => {
     return res.status(403).json({ message: "Only the ride creator can update this ride status." });
   }
 
-  if (status === "Completed") {
+  if (status === "In Progress") {
+    if (!["Open", "Confirmed"].includes(ride.status)) {
+      return res.status(400).json({ message: "Only open or confirmed rides can be started." });
+    }
+    
+    // Also verify there's at least one accepted passenger
+    const acceptedCount = await Booking.countDocuments({ ride: ride._id, status: "Accepted" });
+    if (acceptedCount === 0) {
+      return res.status(400).json({ message: "You cannot start a ride without at least one accepted passenger." });
+    }
+
+    ride.status = "In Progress";
+    await ride.save();
+    
+    // Notify all accepted passengers that the ride has started
+    const acceptedBookings = await Booking.find({ ride: ride._id, status: "Accepted" });
+    for (const booking of acceptedBookings) {
+      await createNotification({
+        user: booking.user,
+        type: "ride_started",
+        message: `Your ride from ${ride.source} to ${ride.destination} has started!`,
+        metadata: { ridePublicId: ride.publicId },
+      });
+    }
+  } else if (status === "Completed") {
     if (ride.status === "Cancelled") {
       return res.status(400).json({ message: "Cancelled rides cannot be completed." });
     }
+
+    // Check if there are any accepted bookings
+    const acceptedBookingsCount = await Booking.countDocuments({ 
+      ride: ride._id, 
+      status: "Accepted" 
+    });
+
+    if (acceptedBookingsCount === 0) {
+      return res.status(400).json({ 
+        message: "You cannot mark a ride as completed if no passengers have been accepted." 
+      });
+    }
+
+    // New check: Cannot complete a ride that hasn't reached its departure time
+    const now = new Date();
+    if (new Date(ride.departureTime) > now) {
+      return res.status(400).json({ 
+        message: "You cannot mark a ride as completed before its scheduled departure time." 
+      });
+    }
+
     ride.status = "Completed";
     await ride.save();
     await processCompletion(ride);

@@ -1,16 +1,21 @@
 function buildPictureUrl(rawUrl) {
   if (!rawUrl) return "";
-  return rawUrl; // Now always a Cloudinary URL
+  // If it's already a full URL (like Google profile pic), return it as is
+  if (rawUrl.startsWith("http")) return rawUrl;
+  return rawUrl; // Otherwise return the path (assuming it's a relative path or Cloudinary ID that frontend handles)
 }
 
 function toUserProfile(user) {
   if (!user) return null;
 
+  // Use profilePictureUrl with a fallback to profilePic for older accounts
+  const rawPic = user.profilePictureUrl || user.profilePic || "";
+
   return {
     id: user.publicId,
     name: user.name,
     email: user.email,
-    profilePictureUrl: buildPictureUrl(user.profilePictureUrl),
+    profilePictureUrl: buildPictureUrl(rawPic),
     joinedAt: user.joinedAt,
     totalRidesParticipated: user.totalRidesParticipated || 0,
     ratings: {
@@ -61,6 +66,9 @@ function toRideCard(ride, currentUser) {
     availableSeats: ride.availableSeats,
     price: ride.price,
     status: ride.status,
+    sourceCoords: ride.sourceCoords?.coordinates || null,
+    destinationCoords: ride.destinationCoords?.coordinates || null,
+    currentLocation: ride.currentLocation?.coordinates || null,
     description: ride.description || "",
     createdAt: ride.createdAt,
     updatedAt: ride.updatedAt,
@@ -68,7 +76,7 @@ function toRideCard(ride, currentUser) {
       ? {
           id: creator.publicId,
           name: creator.name,
-          profilePictureUrl: buildPictureUrl(creator.profilePictureUrl),
+          profilePictureUrl: buildPictureUrl(creator.profilePictureUrl || creator.profilePic || ""),
           ratings: {
             average: Number(creator.ratings?.average || 0),
             count: Number(creator.ratings?.count || 0),
@@ -85,7 +93,7 @@ function toRideCard(ride, currentUser) {
             id: passenger.user.publicId,
             name: passenger.user.name,
             email: passenger.user.email,
-            profilePictureUrl: buildPictureUrl(passenger.user.profilePictureUrl),
+            profilePictureUrl: buildPictureUrl(passenger.user.profilePictureUrl || passenger.user.profilePic || ""),
           }
         : null,
       permissions: {
@@ -99,9 +107,14 @@ function toRideCard(ride, currentUser) {
       },
     })),
     permissions: {
-      canEdit: isOwner && !["Completed", "Cancelled"].includes(ride.status),
+      canEdit: isOwner && !["In Progress", "Completed", "Cancelled"].includes(ride.status),
       canDelete: isOwner,
-      canComplete: isOwner && !["Completed", "Cancelled"].includes(ride.status),
+      canStart: isOwner && 
+                 ["Open", "Confirmed"].includes(ride.status) && 
+                 passengers.some(p => p.status === "Accepted"),
+      canComplete: isOwner && 
+                   ride.status === "In Progress" && 
+                   passengers.some(p => p.status === "Accepted"),
       hasBooked,
       canBook:
         Boolean(currentUserId) &&
@@ -120,6 +133,8 @@ function toBooking(booking) {
     id: booking.publicId,
     seats: booking.seats,
     status: booking.status,
+    finalFare: booking.finalFare || 0,
+    paymentStatus: booking.paymentStatus || "Unpaid",
     createdAt: booking.createdAt,
     updatedAt: booking.updatedAt,
     ride: booking.ride
@@ -145,7 +160,7 @@ function toBooking(booking) {
           id: booking.user.publicId,
           name: booking.user.name,
           email: booking.user.email,
-          profilePictureUrl: buildPictureUrl(booking.user.profilePictureUrl),
+          profilePictureUrl: buildPictureUrl(booking.user.profilePictureUrl || booking.user.profilePic || ""),
         }
       : null,
   };

@@ -8,13 +8,27 @@ const { toReview, toUserProfile } = require("../utils/serializers");
 const secret = process.env.JWT_SECRET || "secretkey";
 
 const signupSchema = Joi.object({
-  name: Joi.string().trim().min(2).max(80).required(),
-  email: Joi.string().email().required(),
-  password: Joi.string().min(8).max(128).required(),
+  name: Joi.string().trim().min(3).max(50).required().messages({
+    'string.min': 'Name must be at least 3 characters',
+    'any.required': 'Name is required'
+  }),
+  email: Joi.string().email().required().messages({
+    'string.email': 'Please provide a valid email address',
+    'any.required': 'Email is required'
+  }),
+  password: Joi.string().min(8).max(128).required().messages({
+    'string.min': 'Password must be at least 8 characters long',
+    'any.required': 'Password is required'
+  }),
 });
 
 const profileSchema = Joi.object({
-  name: Joi.string().trim().min(2).max(80).optional(),
+  name: Joi.string().trim().min(3).max(50).optional().messages({
+    'string.min': 'Name must be at least 3 characters'
+  }),
+  password: Joi.string().min(8).max(128).optional().messages({
+    'string.min': 'Password must be at least 8 characters long'
+  }),
 });
 
 function issueToken(user) {
@@ -131,6 +145,9 @@ exports.updateProfile = async (req, res) => {
     const update = {};
     if (value.name) {
       update.name = value.name.trim();
+    }
+    if (value.password) {
+      update.password = await bcrypt.hash(value.password, 10);
     }
     if (req.file) {
       update.profilePictureUrl = req.file.path || req.file.filename;

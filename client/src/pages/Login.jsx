@@ -11,6 +11,7 @@ export default function Login() {
   const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event) {
@@ -39,10 +40,28 @@ export default function Login() {
         </label>
         <label>
           <span>Password</span>
-          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+          <div className="password-input-wrapper">
+            <input 
+              type={showPassword ? "text" : "password"} 
+              value={password} 
+              onChange={(event) => setPassword(event.target.value)} 
+              required 
+            />
+            <button 
+              type="button" 
+              className="password-toggle" 
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? "👁️" : "👁️‍🗨️"}
+            </button>
+          </div>
         </label>
         <button type="submit" className="solid-button" disabled={loading}>{loading ? "Signing in..." : "Login"}</button>
-        <a className="google-button" href={getGoogleAuthUrl("login")}>Continue with Google</a>
+        <a className="google-button" href={getGoogleAuthUrl("login")}>
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="google-logo" />
+          Continue with Google
+        </a>
         <p className="muted-text">New here? <Link to="/signup">Create an account</Link></p>
       </form>
     </div>

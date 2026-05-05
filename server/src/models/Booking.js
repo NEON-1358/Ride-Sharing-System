@@ -40,6 +40,15 @@ const BookingSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    finalFare: {
+      type: Number,
+      default: 0,
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["Unpaid", "Processing", "Paid"],
+      default: "Unpaid",
+    },
   },
   { timestamps: true }
 );

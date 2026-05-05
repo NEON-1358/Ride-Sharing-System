@@ -49,9 +49,21 @@ const RideSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    sourceCoords: {
+      type: { type: String, enum: ["Point"], default: "Point" },
+      coordinates: { type: [Number], default: [0, 0] },
+    },
+    destinationCoords: {
+      type: { type: String, enum: ["Point"], default: "Point" },
+      coordinates: { type: [Number], default: [0, 0] },
+    },
+    currentLocation: {
+      type: { type: String, enum: ["Point"], default: "Point" },
+      coordinates: { type: [Number], default: [0, 0] },
+    },
     status: {
       type: String,
-      enum: ["Open", "Confirmed", "Completed", "Cancelled"],
+      enum: ["Open", "Confirmed", "In Progress", "Completed", "Cancelled"],
       default: "Open",
       index: true,
     },
@@ -80,5 +92,8 @@ RideSchema.index({ source: "text", destination: "text", description: "text" });
 RideSchema.index({ status: 1, departureTime: 1, availableSeats: 1 });
 // Index for source/destination searches (partial text matching)
 RideSchema.index({ source: 1, destination: 1 });
+RideSchema.index({ sourceCoords: "2dsphere" });
+RideSchema.index({ destinationCoords: "2dsphere" });
+RideSchema.index({ currentLocation: "2dsphere" });
 
 module.exports = mongoose.model("Ride", RideSchema);
