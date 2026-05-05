@@ -164,7 +164,7 @@ export default function MyRides() {
 
   async function changeRideStatus(rideId, status) {
     try {
-      await updateRideStatus(rideId, { status });
+      await updateRideStatus(rideId, status);
       showToast(`Ride marked as ${status}.`);
       await loadData();
     } catch (error) {

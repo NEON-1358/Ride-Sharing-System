@@ -110,8 +110,8 @@ function toRideCard(ride, currentUser) {
       canEdit: isOwner && !["In Progress", "Completed", "Cancelled"].includes(ride.status),
       canDelete: isOwner,
       canStart: isOwner && 
-                 ride.status === "Confirmed" && 
-                 new Date(ride.departureTime) <= new Date(),
+                 ["Open", "Confirmed"].includes(ride.status) && 
+                 passengers.some(p => p.status === "Accepted"),
       canComplete: isOwner && 
                    ride.status === "In Progress" && 
                    passengers.some(p => p.status === "Accepted"),

@@ -394,9 +394,16 @@ exports.updateRideStatus = async (req, res) => {
   }
 
   if (status === "In Progress") {
-    if (ride.status !== "Confirmed") {
-      return res.status(400).json({ message: "Only confirmed rides can be started." });
+    if (!["Open", "Confirmed"].includes(ride.status)) {
+      return res.status(400).json({ message: "Only open or confirmed rides can be started." });
     }
+    
+    // Also verify there's at least one accepted passenger
+    const acceptedCount = await Booking.countDocuments({ ride: ride._id, status: "Accepted" });
+    if (acceptedCount === 0) {
+      return res.status(400).json({ message: "You cannot start a ride without at least one accepted passenger." });
+    }
+
     ride.status = "In Progress";
     await ride.save();
     

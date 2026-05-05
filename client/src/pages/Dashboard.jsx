@@ -104,6 +104,17 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [filters]);
 
+  useEffect(() => {
+    // Show rides on map
+    const rideMarkers = rides.map(ride => ({
+      position: ride.currentLocation ? [ride.currentLocation[1], ride.currentLocation[0]] : null,
+      popup: `Ride: ${ride.source} to ${ride.destination} (${ride.status})`,
+      type: ride.status === "In Progress" ? 'active_ride' : 'ride'
+    })).filter(m => m.position);
+    
+    setMarkers(rideMarkers);
+  }, [rides]);
+
   function updateFilter(event) {
     const { name, value } = event.target;
     setFilters((current) => ({ ...current, [name]: value }));
