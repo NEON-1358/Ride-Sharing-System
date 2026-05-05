@@ -67,7 +67,16 @@ export default function Profile() {
       <section className="content-grid profile-grid">
         <div className="panel profile-summary">
           <div className="avatar-wrap">
-            {user.profilePictureUrl ? <img src={user.profilePictureUrl} alt={user.name} className="avatar-image" /> : <div className="avatar-fallback">{initials}</div>}
+            {user.profilePictureUrl ? (
+              <img 
+                src={user.profilePictureUrl} 
+                alt={user.name} 
+                className="avatar-image" 
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="avatar-fallback">{initials}</div>
+            )}
           </div>
           <h1>{user.name}</h1>
           <p>{user.email}</p>

@@ -6,11 +6,26 @@ const { createNotification } = require("../utils/notifications");
 const { toRideCard } = require("../utils/serializers");
 
 const rideSchema = Joi.object({
-  source: Joi.string().trim().min(2).max(80).required(),
-  destination: Joi.string().trim().min(2).max(80).required(),
-  departureTime: Joi.date().iso().greater("now").required(),
-  totalSeats: Joi.number().integer().min(1).max(10).required(),
-  price: Joi.number().min(0).required(),
+  source: Joi.string().trim().min(3).max(100).required().messages({
+    'string.min': 'Source location must be at least 3 characters long',
+    'any.required': 'Source location is required'
+  }),
+  destination: Joi.string().trim().min(3).max(100).required().messages({
+    'string.min': 'Destination location must be at least 3 characters long',
+    'any.required': 'Destination location is required'
+  }),
+  departureTime: Joi.date().iso().greater("now").required().messages({
+    'date.greater': 'Departure time must be in the future',
+    'any.required': 'Departure time is required'
+  }),
+  totalSeats: Joi.number().integer().min(1).max(8).required().messages({
+    'number.min': 'At least 1 seat must be offered',
+    'number.max': 'You cannot offer more than 8 seats in a standard ride'
+  }),
+  price: Joi.number().min(50).max(5000).required().messages({
+    'number.min': 'Price must be at least ₹50',
+    'number.max': 'Price cannot exceed ₹5000'
+  }),
   description: Joi.string().trim().max(300).allow("").optional(),
 });
 
@@ -204,11 +219,35 @@ exports.getRide = async (req, res) => {
   );
 };
 
+async function verifyLocation(name) {
+  try {
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(name)}&limit=1`);
+    const data = await response.json();
+    return data && data.length > 0;
+  } catch (err) {
+    console.error("Geocoding verification error:", err);
+    return true; // Fallback to true if API is down to avoid blocking users
+  }
+}
+
 exports.createRide = async (req, res, next) => {
   try {
     const { error, value } = rideSchema.validate(req.body);
     if (error) {
       return res.status(400).json({ message: error.details[0].message });
+    }
+
+    // Strict Backend verification of locations
+    const [isSourceValid, isDestValid] = await Promise.all([
+      verifyLocation(value.source),
+      verifyLocation(value.destination)
+    ]);
+
+    if (!isSourceValid) {
+      return res.status(400).json({ message: `The location '${value.source}' could not be verified on the map. Please use a real address.` });
+    }
+    if (!isDestValid) {
+      return res.status(400).json({ message: `The location '${value.destination}' could not be verified on the map. Please use a real address.` });
     }
 
     const ride = await Ride.create({

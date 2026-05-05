@@ -52,6 +52,7 @@ passport.use(
             email: email || `${profile.id}@google.oauth.local`,
             googleId: profile.id,
             profilePictureUrl: profile.photos?.[0]?.value || "",
+            profilePic: profile.photos?.[0]?.value || "", // Set both for compatibility
           });
         } else {
           let changed = false;
@@ -59,10 +60,21 @@ passport.use(
             user.googleId = profile.id;
             changed = true;
           }
-          if (!user.profilePictureUrl && profile.photos?.[0]?.value) {
-            user.profilePictureUrl = profile.photos[0].value;
-            changed = true;
+          
+          const googlePhoto = profile.photos?.[0]?.value;
+          if (googlePhoto) {
+            // If profilePictureUrl is missing or is not the current Google photo
+            if (!user.profilePictureUrl || user.profilePictureUrl !== googlePhoto) {
+              user.profilePictureUrl = googlePhoto;
+              changed = true;
+            }
+            // Also update legacy field
+            if (!user.profilePic || user.profilePic !== googlePhoto) {
+              user.profilePic = googlePhoto;
+              changed = true;
+            }
           }
+
           if (changed) {
             await user.save();
           }

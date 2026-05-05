@@ -496,6 +496,39 @@ h2, h3 { margin: 0; }
   40% { transform: translateY(-5px); }
 }
 
+/* Location Suggestions Dropdown */
+.relative { 
+  position: relative; 
+  width: 100%;
+  z-index: 10;
+}
+.suggestions-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  z-index: 1000;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+.suggestion-item {
+  padding: 0.8rem 1rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.suggestion-item:last-child { border-bottom: none; }
+.suggestion-item:hover { background: #f8f8f8; }
+
 @keyframes slideIn {
   from {
     transform: translateX(100%);
