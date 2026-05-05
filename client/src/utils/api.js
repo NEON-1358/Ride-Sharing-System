@@ -94,8 +94,18 @@ export function updateRide(rideId, payload) {
   return request(`/rides/${rideId}`, { method: "PATCH", body: JSON.stringify(payload) });
 }
 
-export function updateRideStatus(rideId, payload) {
-  return request(`/rides/${rideId}/status`, { method: "PATCH", body: JSON.stringify(payload) });
+export function updateRideStatus(rideId, status, cancelledReason) {
+  return request(`/rides/${rideId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, cancelledReason }),
+  });
+}
+
+export function updateRideLocation(rideId, lat, lon) {
+  return request(`/rides/${rideId}/location`, {
+    method: "PATCH",
+    body: JSON.stringify({ lat, lon }),
+  });
 }
 
 export function deleteRide(rideId) {

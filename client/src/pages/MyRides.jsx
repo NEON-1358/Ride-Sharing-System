@@ -11,6 +11,8 @@ const createRideState = {
   totalSeats: 1,
   price: 0,
   description: "",
+  sourceCoords: null,
+  destinationCoords: null,
 };
 
 export default function MyRides() {
@@ -76,6 +78,28 @@ export default function MyRides() {
       }
     }
   }
+
+  useEffect(() => {
+    let watchId = null;
+    const inProgressRides = myRides.filter(r => r.status === "In Progress");
+
+    if (inProgressRides.length > 0 && navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          inProgressRides.forEach(ride => {
+            updateRideLocation(ride.id, latitude, longitude).catch(err => console.error("Location sync error:", err));
+          });
+        },
+        (error) => console.error("Geolocation error:", error),
+        { enableHighAccuracy: true, distanceFilter: 50 } // Update every 50 meters
+      );
+    }
+
+    return () => {
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+    };
+  }, [myRides]);
 
   async function handleCreateRide(event) {
     event.preventDefault();
@@ -203,7 +227,12 @@ export default function MyRides() {
   }
 
   function handleSelectSuggestion(suggestion, type) {
-    setRideForm(prev => ({ ...prev, [type]: suggestion.display_name }));
+    const coords = [parseFloat(suggestion.lon), parseFloat(suggestion.lat)];
+    setRideForm(prev => ({ 
+      ...prev, 
+      [type]: suggestion.display_name,
+      [`${type}Coords`]: coords
+    }));
     setSuggestions(prev => ({ ...prev, [type]: [] }));
   }
 
@@ -321,8 +350,9 @@ export default function MyRides() {
                   </div>
                 )}
                 <div className="ride-actions">
-                  {ride.permissions.canComplete ? <button type="button" className="solid-button" onClick={() => changeRideStatus(ride.id, "Completed")}>Mark completed</button> : null}
-                  {ride.status !== "Cancelled" ? <button type="button" className="ghost-button" onClick={() => changeRideStatus(ride.id, "Cancelled")}>Cancel ride</button> : null}
+                  {ride.permissions.canStart ? <button type="button" className="solid-button" onClick={() => changeRideStatus(ride.id, "In Progress")}>Start trip</button> : null}
+                  {ride.permissions.canComplete ? <button type="button" className="solid-button" onClick={() => changeRideStatus(ride.id, "Completed")}>End trip & Complete</button> : null}
+                  {!["Completed", "Cancelled"].includes(ride.status) ? <button type="button" className="ghost-button" onClick={() => changeRideStatus(ride.id, "Cancelled")}>Cancel ride</button> : null}
                   <button type="button" className="ghost-button" onClick={() => handleDeleteRide(ride.id)}>Delete</button>
                 </div>
               </article>
@@ -351,6 +381,9 @@ export default function MyRides() {
                 </div>
                 <div className="ride-meta">
                   <span>{booking.seats} seat(s)</span>
+                  {booking.status === "Completed" && (
+                    <span className="accent-text">Fare: ₹{booking.finalFare} ({booking.paymentStatus})</span>
+                  )}
                   <span>Driver: <Link to={`/profile/${booking.ride?.creator?.id}`} className="user-link">{booking.ride?.creator?.name}</Link></span>
                 </div>
                 <div className="ride-actions">

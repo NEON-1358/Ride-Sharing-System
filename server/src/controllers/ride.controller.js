@@ -27,6 +27,8 @@ const rideSchema = Joi.object({
     'number.max': 'Price cannot exceed ₹5000'
   }),
   description: Joi.string().trim().max(300).allow("").optional(),
+  sourceCoords: Joi.array().items(Joi.number()).length(2).optional(),
+  destinationCoords: Joi.array().items(Joi.number()).length(2).optional(),
 });
 
 const rideUpdateSchema = Joi.object({
@@ -61,8 +63,17 @@ async function processCompletion(ride) {
   const bookings = await Booking.find({ ride: ride._id, status: "Accepted" });
   const userSeatCounts = new Map();
 
+  // Fare Calculation & Payment Simulation
+  const basePrice = ride.price;
+  const surgeMultiplier = Math.random() * (1.5 - 1.0) + 1.0; // Random surge between 1.0x and 1.5x
+  
   for (const booking of bookings) {
+    // Calculate final fare: (Base Price * Seats) * Surge
+    const calculatedFare = Math.round((basePrice * booking.seats) * surgeMultiplier);
+    
     booking.status = "Completed";
+    booking.finalFare = calculatedFare;
+    booking.paymentStatus = "Paid"; // Simulate successful payment
     await booking.save();
 
     const previous = userSeatCounts.get(String(booking.user)) || 0;
@@ -254,6 +265,9 @@ exports.createRide = async (req, res, next) => {
       ...value,
       availableSeats: value.totalSeats,
       creator: req.user._id,
+      sourceCoords: value.sourceCoords ? { type: "Point", coordinates: value.sourceCoords } : undefined,
+      destinationCoords: value.destinationCoords ? { type: "Point", coordinates: value.destinationCoords } : undefined,
+      currentLocation: value.sourceCoords ? { type: "Point", coordinates: value.sourceCoords } : undefined,
     });
 
     const populatedRide = await loadRideForOutput(ride._id, req.user.publicId);
@@ -313,6 +327,32 @@ exports.updateRide = async (req, res) => {
   return res.json(await loadRideForOutput(ride._id, req.user.publicId));
 };
 
+exports.updateRideLocation = async (req, res) => {
+  const { lat, lon } = req.body;
+  if (lat === undefined || lon === undefined) {
+    return res.status(400).json({ message: "Latitude and longitude are required." });
+  }
+
+  const ride = await Ride.findOne({ publicId: req.params.rideId });
+  if (!ride) {
+    return res.status(404).json({ message: "Ride not found." });
+  }
+
+  const rideCreatorId = ride.creator?._id || ride.creator;
+  if (String(rideCreatorId) !== String(req.user._id)) {
+    return res.status(403).json({ message: "Only the ride creator can update the location." });
+  }
+
+  if (ride.status !== "In Progress") {
+    return res.status(400).json({ message: "Location can only be updated while the ride is In Progress." });
+  }
+
+  ride.currentLocation = { type: "Point", coordinates: [parseFloat(lon), parseFloat(lat)] };
+  await ride.save();
+
+  return res.json({ message: "Location updated successfully." });
+};
+
 exports.deleteRide = async (req, res) => {
   const ride = await Ride.findOne({ publicId: req.params.rideId });
   if (!ride) {
@@ -339,7 +379,7 @@ exports.updateRideStatus = async (req, res) => {
   const status = req.body.status;
   const cancelledReason = typeof req.body.cancelledReason === "string" ? req.body.cancelledReason.trim() : "";
 
-  if (!["Open", "Confirmed", "Completed", "Cancelled"].includes(status)) {
+  if (!["Open", "Confirmed", "In Progress", "Completed", "Cancelled"].includes(status)) {
     return res.status(400).json({ message: "Invalid ride status." });
   }
 
@@ -353,7 +393,24 @@ exports.updateRideStatus = async (req, res) => {
     return res.status(403).json({ message: "Only the ride creator can update this ride status." });
   }
 
-  if (status === "Completed") {
+  if (status === "In Progress") {
+    if (ride.status !== "Confirmed") {
+      return res.status(400).json({ message: "Only confirmed rides can be started." });
+    }
+    ride.status = "In Progress";
+    await ride.save();
+    
+    // Notify all accepted passengers that the ride has started
+    const acceptedBookings = await Booking.find({ ride: ride._id, status: "Accepted" });
+    for (const booking of acceptedBookings) {
+      await createNotification({
+        user: booking.user,
+        type: "ride_started",
+        message: `Your ride from ${ride.source} to ${ride.destination} has started!`,
+        metadata: { ridePublicId: ride.publicId },
+      });
+    }
+  } else if (status === "Completed") {
     if (ride.status === "Cancelled") {
       return res.status(400).json({ message: "Cancelled rides cannot be completed." });
     }

@@ -66,6 +66,9 @@ function toRideCard(ride, currentUser) {
     availableSeats: ride.availableSeats,
     price: ride.price,
     status: ride.status,
+    sourceCoords: ride.sourceCoords?.coordinates || null,
+    destinationCoords: ride.destinationCoords?.coordinates || null,
+    currentLocation: ride.currentLocation?.coordinates || null,
     description: ride.description || "",
     createdAt: ride.createdAt,
     updatedAt: ride.updatedAt,
@@ -104,12 +107,14 @@ function toRideCard(ride, currentUser) {
       },
     })),
     permissions: {
-      canEdit: isOwner && !["Completed", "Cancelled"].includes(ride.status),
+      canEdit: isOwner && !["In Progress", "Completed", "Cancelled"].includes(ride.status),
       canDelete: isOwner,
+      canStart: isOwner && 
+                 ride.status === "Confirmed" && 
+                 new Date(ride.departureTime) <= new Date(),
       canComplete: isOwner && 
-                   !["Completed", "Cancelled"].includes(ride.status) && 
-                   passengers.some(p => p.status === "Accepted") &&
-                   new Date(ride.departureTime) <= new Date(),
+                   ride.status === "In Progress" && 
+                   passengers.some(p => p.status === "Accepted"),
       hasBooked,
       canBook:
         Boolean(currentUserId) &&
@@ -128,6 +133,8 @@ function toBooking(booking) {
     id: booking.publicId,
     seats: booking.seats,
     status: booking.status,
+    finalFare: booking.finalFare || 0,
+    paymentStatus: booking.paymentStatus || "Unpaid",
     createdAt: booking.createdAt,
     updatedAt: booking.updatedAt,
     ride: booking.ride

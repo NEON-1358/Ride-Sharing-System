@@ -26,6 +26,9 @@ const profileSchema = Joi.object({
   name: Joi.string().trim().min(3).max(50).optional().messages({
     'string.min': 'Name must be at least 3 characters'
   }),
+  password: Joi.string().min(8).max(128).optional().messages({
+    'string.min': 'Password must be at least 8 characters long'
+  }),
 });
 
 function issueToken(user) {
@@ -142,6 +145,9 @@ exports.updateProfile = async (req, res) => {
     const update = {};
     if (value.name) {
       update.name = value.name.trim();
+    }
+    if (value.password) {
+      update.password = await bcrypt.hash(value.password, 10);
     }
     if (req.file) {
       update.profilePictureUrl = req.file.path || req.file.filename;

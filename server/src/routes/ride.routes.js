@@ -9,6 +9,7 @@ router.get("/:rideId", optionalAuth, rideController.getRide);
 router.post("/", authMiddleware, rideController.createRide);
 router.patch("/:rideId", authMiddleware, rideController.updateRide);
 router.patch("/:rideId/status", authMiddleware, rideController.updateRideStatus);
+router.patch("/:rideId/location", authMiddleware, rideController.updateRideLocation);
 router.delete("/:rideId", authMiddleware, rideController.deleteRide);
 
 module.exports = router;

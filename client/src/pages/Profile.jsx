@@ -12,6 +12,9 @@ export default function Profile() {
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [profilePicture, setProfilePicture] = useState(null);
 
   const isOwnProfile = !userId || userId === currentUser?.id;
@@ -44,13 +47,22 @@ export default function Profile() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    
+    if (password) {
+      if (password.length < 8) return showToast("Password must be at least 8 characters.", "error");
+      if (password !== confirmPassword) return showToast("Passwords do not match.", "error");
+    }
+
     const payload = new FormData();
     payload.append("name", name);
+    if (password) payload.append("password", password);
     if (profilePicture) payload.append("profilePicture", profilePicture);
 
     try {
       await updateProfile(payload);
       await refreshUser();
+      setPassword("");
+      setConfirmPassword("");
       showToast("Profile updated successfully.");
     } catch (error) {
       showToast(error.message, 'error');
@@ -98,10 +110,44 @@ export default function Profile() {
             <form className="stack-form" onSubmit={handleSubmit}>
               <label>
                 <span>Name</span>
-                <input value={name} onChange={(event) => setName(event.target.value)} required />
+                <input type="text" value={name} onChange={(event) => setName(event.target.value)} required />
               </label>
+              
+              <div className="divider" style={{ margin: '1rem 0', borderBottom: '1px solid var(--line)' }}></div>
+              <p className="muted-text" style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>Change Password (Optional)</p>
+              
               <label>
-                <span>New profile picture</span>
+                <span>New Password</span>
+                <div className="password-input-wrapper">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    value={password} 
+                    onChange={(event) => setPassword(event.target.value)} 
+                    placeholder="Leave blank to keep current"
+                  />
+                  <button 
+                    type="button" 
+                    className="password-toggle" 
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? "👁️" : "👁️‍🗨️"}
+                  </button>
+                </div>
+              </label>
+              
+              {password && (
+                <label>
+                  <span>Confirm New Password</span>
+                  <input 
+                    type="password" 
+                    value={confirmPassword} 
+                    onChange={(event) => setConfirmPassword(event.target.value)} 
+                  />
+                </label>
+              )}
+
+              <label>
+                <span>Profile picture</span>
                 <input type="file" accept="image/*" onChange={(event) => setProfilePicture(event.target.files?.[0] || null)} />
               </label>
               <button type="submit" className="solid-button">Save changes</button>

@@ -14,6 +14,8 @@ export default function Signup() {
     password: "",
     confirmPassword: "",
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [profilePicture, setProfilePicture] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -59,18 +61,51 @@ export default function Signup() {
         </label>
         <label>
           <span>Password</span>
-          <input type="password" name="password" value={form.password} onChange={updateField} required />
+          <div className="password-input-wrapper">
+            <input 
+              type={showPassword ? "text" : "password"} 
+              name="password" 
+              value={form.password} 
+              onChange={updateField} 
+              required 
+            />
+            <button 
+              type="button" 
+              className="password-toggle" 
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? "👁️" : "👁️‍🗨️"}
+            </button>
+          </div>
         </label>
         <label>
           <span>Confirm password</span>
-          <input type="password" name="confirmPassword" value={form.confirmPassword} onChange={updateField} required />
+          <div className="password-input-wrapper">
+            <input 
+              type={showConfirmPassword ? "text" : "password"} 
+              name="confirmPassword" 
+              value={form.confirmPassword} 
+              onChange={updateField} 
+              required 
+            />
+            <button 
+              type="button" 
+              className="password-toggle" 
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              {showConfirmPassword ? "👁️" : "👁️‍🗨️"}
+            </button>
+          </div>
         </label>
         <label>
           <span>Profile picture</span>
           <input type="file" accept="image/*" onChange={(event) => setProfilePicture(event.target.files?.[0] || null)} />
         </label>
         <button type="submit" className="solid-button" disabled={loading}>{loading ? "Creating account..." : "Signup"}</button>
-        <a className="google-button" href={getGoogleAuthUrl("signup")}>Continue with Google</a>
+        <a className="google-button" href={getGoogleAuthUrl("signup")}>
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="google-logo" />
+          Continue with Google
+        </a>
         <p className="muted-text">Already have an account? <Link to="/login">Login</Link></p>
       </form>
     </div>

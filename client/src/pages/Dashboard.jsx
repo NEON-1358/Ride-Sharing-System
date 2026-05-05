@@ -95,7 +95,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData();
-  }, []);
+
+    // Live Tracking Sync for "In Progress" rides
+    const interval = setInterval(() => {
+      loadData(filters);
+    }, 15000); // Sync every 15 seconds
+
+    return () => clearInterval(interval);
+  }, [filters]);
 
   function updateFilter(event) {
     const { name, value } = event.target;
