@@ -21,7 +21,7 @@ const app = express();
 // Global Rate Limiting
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, 
+  max: 500, // Increased for testing
   message: { message: "Too many requests from this IP, please try again after 15 minutes" },
   standardHeaders: true,
   legacyHeaders: false,
@@ -30,7 +30,7 @@ const globalLimiter = rateLimit({
 // Stricter limiter for Auth routes
 const authLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, 
+  max: 50, // Increased for testing
   message: { message: "Too many authentication attempts, please try again after an hour" },
   standardHeaders: true,
   legacyHeaders: false,

@@ -357,6 +357,27 @@ exports.updateRideStatus = async (req, res) => {
     if (ride.status === "Cancelled") {
       return res.status(400).json({ message: "Cancelled rides cannot be completed." });
     }
+
+    // Check if there are any accepted bookings
+    const acceptedBookingsCount = await Booking.countDocuments({ 
+      ride: ride._id, 
+      status: "Accepted" 
+    });
+
+    if (acceptedBookingsCount === 0) {
+      return res.status(400).json({ 
+        message: "You cannot mark a ride as completed if no passengers have been accepted." 
+      });
+    }
+
+    // New check: Cannot complete a ride that hasn't reached its departure time
+    const now = new Date();
+    if (new Date(ride.departureTime) > now) {
+      return res.status(400).json({ 
+        message: "You cannot mark a ride as completed before its scheduled departure time." 
+      });
+    }
+
     ride.status = "Completed";
     await ride.save();
     await processCompletion(ride);

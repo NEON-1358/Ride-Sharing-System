@@ -108,7 +108,8 @@ function toRideCard(ride, currentUser) {
       canDelete: isOwner,
       canComplete: isOwner && 
                    !["Completed", "Cancelled"].includes(ride.status) && 
-                   passengers.some(p => p.status === "Accepted"),
+                   passengers.some(p => p.status === "Accepted") &&
+                   new Date(ride.departureTime) <= new Date(),
       hasBooked,
       canBook:
         Boolean(currentUserId) &&

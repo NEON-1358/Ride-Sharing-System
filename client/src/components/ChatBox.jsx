@@ -19,6 +19,8 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
   const riderId = passengerId;
 
   useEffect(() => {
+    if (!token || !bookingId) return;
+
     const fetchHistory = async () => {
       try {
         const history = await getChatHistory(bookingId);
@@ -49,6 +51,7 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
     s.on('connect', () => {
       console.log("SUCCESS: Socket connected! ID:", s.id);
       console.log("ACTION: Joining room:", bookingId);
+      console.log("DEBUG IDs:", { currentUserId, ownerId, riderId });
       s.emit('join', bookingId);
     });
 
@@ -124,12 +127,17 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
     socket.emit('stop_typing', { room: bookingId, from: currentUserId });
 
     // Determine the receiver ID
-    const toId = String(currentUserId) === String(ownerId) ? riderId : ownerId;
+    // CRITICAL FIX: Ensure we use the correct ID format for comparison
+    const curIdStr = String(currentUserId);
+    const ownerIdStr = String(ownerId);
+    const riderIdStr = String(riderId);
+    
+    const toId = curIdStr === ownerIdStr ? riderIdStr : ownerIdStr;
 
     console.log("SENDING DEBUG:", {
-      currentUserId,
-      ownerId,
-      riderId,
+      currentUserId: curIdStr,
+      ownerId: ownerIdStr,
+      riderId: riderIdStr,
       toId,
       room: bookingId,
       text: input

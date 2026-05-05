@@ -1,4 +1,10 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+const getApiBase = () => {
+  if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL;
+  // Fallback to current hostname but on port 3000
+  return `${window.location.protocol}//${window.location.hostname}:3000/api`;
+};
+
+const API_BASE = getApiBase();
 const TOKEN_KEY = "rideshare_token";
 
 export function getToken() {
