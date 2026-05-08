@@ -201,15 +201,25 @@ export default function MyRides() {
   }
 
   useEffect(() => {
+    const socketUrl = `${window.location.protocol}//${window.location.hostname}:3000/location`;
+    const s = io(socketUrl, { transports: ['websocket', 'polling'] });
+    setLocationSocket(s);
+    return () => s.disconnect();
+  }, []);
+
+  useEffect(() => {
     let watchId = null;
     const inProgressRides = myRides.filter(r => r.status === "In Progress");
 
-    if (inProgressRides.length > 0 && navigator.geolocation) {
+    if (inProgressRides.length > 0 && navigator.geolocation && locationSocket) {
       watchId = navigator.geolocation.watchPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
           inProgressRides.forEach(ride => {
+            // Update API
             updateRideLocation(ride.id, latitude, longitude).catch(err => console.error("Location sync error:", err));
+            // Update Socket
+            locationSocket.emit("update_location", { rideId: ride.id, lat: latitude, lng: longitude });
           });
         },
         (error) => console.error("Geolocation error:", error),
@@ -220,7 +230,7 @@ export default function MyRides() {
     return () => {
       if (watchId) navigator.geolocation.clearWatch(watchId);
     };
-  }, [myRides]);
+  }, [myRides, locationSocket]);
 
   async function handleCreateRide(event) {
     event.preventDefault();

@@ -4,7 +4,8 @@ import { createBooking, listNotifications, listRides, markNotificationsRead } fr
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import MapComponent from "../components/MapComponent";
-import { FaCircle, FaSquare, FaClock, FaUser, FaMapMarkerAlt, FaSearch, FaRegTimesCircle } from "react-icons/fa";
+import { FaCircle, FaSquare, FaClock, FaUser, FaMapMarkerAlt, FaSearch, FaRegTimesCircle, FaCar } from "react-icons/fa";
+import { io } from "socket.io-client";
 
 const initialFilters = { source: "", destination: "", dateFrom: "", dateTo: "", seats: "", page: 1, limit: 6 };
 
@@ -19,8 +20,35 @@ export default function Dashboard() {
   const [mapCenter, setMapCenter] = useState([22.9734, 78.6569]); // Center of India
   const [mapZoom, setMapZoom] = useState(5);
   const [markers, setMarkers] = useState([]);
+  const [liveMarkers, setLiveMarkers] = useState({});
   const [route, setRoute] = useState([]);
   const [activeField, setActiveField] = useState('source'); // 'source' or 'destination'
+
+  useEffect(() => {
+    const socketUrl = `${window.location.protocol}//${window.location.hostname}:3000/location`;
+    const s = io(socketUrl, { transports: ['websocket', 'polling'] });
+
+    s.on('location_updated', (data) => {
+      setLiveMarkers(prev => ({
+        ...prev,
+        [data.rideId]: { position: [data.lat, data.lng], type: 'live_car' }
+      }));
+    });
+
+    // Join tracking for all in-progress rides we see
+    rides.forEach(ride => {
+      if (ride.status === "In Progress") {
+        s.emit('join_ride_tracking', ride.id);
+      }
+    });
+
+    return () => s.disconnect();
+  }, [rides]);
+
+  const allMarkers = [
+    ...markers,
+    ...Object.values(liveMarkers)
+  ];
 
   async function fetchRoute(startCoords, endCoords) {
     if (!startCoords || !endCoords) return;
@@ -476,7 +504,7 @@ export default function Dashboard() {
           <MapComponent 
             center={mapCenter} 
             zoom={mapZoom} 
-            markers={markers} 
+            markers={allMarkers} 
             route={route}
             onMapClick={handleMapClick} 
           />

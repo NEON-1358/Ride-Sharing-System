@@ -2,6 +2,8 @@ import React, { useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, Polyline } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { FaCar } from "react-icons/fa";
+import { renderToString } from 'react-dom/server';
 
 // Fix for default marker icons in Leaflet
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -13,6 +15,30 @@ L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
+});
+
+// Create a custom car icon using Leaflet.divIcon
+const carIconHtml = renderToString(
+  <div style={{ 
+    color: '#165d4a', 
+    fontSize: '24px', 
+    backgroundColor: 'white', 
+    borderRadius: '50%', 
+    padding: '4px',
+    boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  }}>
+    <FaCar />
+  </div>
+);
+
+const carIcon = L.divIcon({
+  html: carIconHtml,
+  className: 'custom-car-icon',
+  iconSize: [32, 32],
+  iconAnchor: [16, 16]
 });
 
 function ChangeView({ center, zoom, markers, route }) {
@@ -71,7 +97,11 @@ export default function MapComponent({ center = [22.9734, 78.6569], zoom = 5, ma
       )}
 
       {displayMarkers.map((marker, idx) => (
-        <Marker key={idx} position={marker.position}>
+        <Marker 
+          key={idx} 
+          position={marker.position} 
+          icon={marker.type === 'live_car' ? carIcon : new L.Icon.Default()}
+        >
           {marker.popup && <Popup>{marker.popup}</Popup>}
         </Marker>
       ))}
