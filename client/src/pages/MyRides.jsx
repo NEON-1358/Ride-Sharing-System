@@ -28,6 +28,8 @@ export default function MyRides() {
   const [noResults, setNoResults] = useState({ source: false, destination: false });
   const [isValidating, setIsValidating] = useState(false);
   const dropdownRef = useRef(null);
+  const abortControllerRef = useRef({ source: null, destination: null });
+  const skipSearchRef = useRef({ source: false, destination: false });
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -38,11 +40,20 @@ export default function MyRides() {
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      // Clean up abort controllers
+      if (abortControllerRef.current.source) abortControllerRef.current.source.abort();
+      if (abortControllerRef.current.destination) abortControllerRef.current.destination.abort();
+    };
   }, []);
 
   // Debounced suggestion fetch
   useEffect(() => {
+    if (skipSearchRef.current.source) {
+      skipSearchRef.current.source = false;
+      return;
+    }
     const delayDebounceFn = setTimeout(() => {
       if (rideForm.source.trim().length >= 3) {
         fetchSuggestions(rideForm.source, "source");
@@ -56,6 +67,10 @@ export default function MyRides() {
   }, [rideForm.source]);
 
   useEffect(() => {
+    if (skipSearchRef.current.destination) {
+      skipSearchRef.current.destination = false;
+      return;
+    }
     const delayDebounceFn = setTimeout(() => {
       if (rideForm.destination.trim().length >= 3) {
         fetchSuggestions(rideForm.destination, "destination");
@@ -69,34 +84,57 @@ export default function MyRides() {
   }, [rideForm.destination]);
 
   async function fetchSuggestions(query, type) {
+    // Cancel previous request for this type
+    if (abortControllerRef.current[type]) {
+      abortControllerRef.current[type].abort();
+    }
+    abortControllerRef.current[type] = new AbortController();
+
     setLoadingSuggestions(prev => ({ ...prev, [type]: true }));
     setNoResults(prev => ({ ...prev, [type]: false }));
     
     try {
-      // First attempt: Search within India with jsonv2 for better results
-      let response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=8&countrycodes=in&accept-language=en`);
+      // Using Photon API (photon.komoot.io) which is much better for autocomplete/type-ahead
+      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8&location_bias_scale=0.5`;
+      const response = await fetch(url, { signal: abortControllerRef.current[type].signal });
+      
       if (!response.ok) throw new Error("Network response was not ok");
-      let data = await response.json();
+      const data = await response.json();
       
-      // Second attempt: If no results in India, try global search
-      if (!data || data.length === 0) {
-        response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=8&accept-language=en`);
-        if (response.ok) {
-          data = await response.json();
-        }
-      }
-      
-      if (Array.isArray(data) && data.length > 0) {
-        setSuggestions(prev => ({ ...prev, [type]: data }));
-        setNoResults(prev => ({ ...prev, [type]: false }));
+      if (data && data.features) {
+        // Map Photon features to our expected structure
+        const mappedResults = data.features.map(f => {
+          const p = f.properties;
+          const name = p.name || "";
+          const city = p.city || p.town || p.village || "";
+          const state = p.state || "";
+          const country = p.country || "";
+          
+          // Create a nice display name: "Name, City, State, Country"
+          const parts = [name, city, state, country].filter(part => part && part.length > 0);
+          const displayName = [...new Set(parts)].join(", "); // Remove duplicates and join
+          
+          return {
+            display_name: displayName,
+            lat: f.geometry.coordinates[1],
+            lon: f.geometry.coordinates[0],
+            raw: p // keep original properties just in case
+          };
+        });
+
+        // Filter to prioritize India results if any exist, or just show all
+        const indiaResults = mappedResults.filter(r => r.display_name.toLowerCase().includes("india"));
+        const finalResults = indiaResults.length > 0 ? indiaResults : mappedResults;
+
+        setSuggestions(prev => ({ ...prev, [type]: finalResults }));
+        setNoResults(prev => ({ ...prev, [type]: finalResults.length === 0 }));
       } else {
         setSuggestions(prev => ({ ...prev, [type]: [] }));
         setNoResults(prev => ({ ...prev, [type]: true }));
       }
     } catch (error) {
+      if (error.name === 'AbortError') return; // Ignore aborted requests
       console.error("Suggestions error:", error);
-      // If the API call fails (e.g., rate limit), don't immediately show "No results"
-      // unless we're sure it's not a temporary network issue.
       setSuggestions(prev => ({ ...prev, [type]: [] }));
       setNoResults(prev => ({ ...prev, [type]: true }));
     } finally {
@@ -292,6 +330,7 @@ export default function MyRides() {
 
   function handleSelectSuggestion(suggestion, type) {
     const coords = [parseFloat(suggestion.lon), parseFloat(suggestion.lat)];
+    skipSearchRef.current[type] = true;
     setRideForm(prev => ({ 
       ...prev, 
       [type]: suggestion.display_name,
