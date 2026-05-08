@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { createBooking, listNotifications, listRides, markNotificationsRead } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import MapComponent from "../components/MapComponent";
-import { FaCircle, FaSquare, FaClock, FaUser } from "react-icons/fa";
+import { FaCircle, FaSquare, FaClock, FaUser, FaMapMarkerAlt, FaSearch, FaRegTimesCircle, FaCar } from "react-icons/fa";
+import { io } from "socket.io-client";
 
 const initialFilters = { source: "", destination: "", dateFrom: "", dateTo: "", seats: "", page: 1, limit: 6 };
 
@@ -19,12 +20,208 @@ export default function Dashboard() {
   const [mapCenter, setMapCenter] = useState([22.9734, 78.6569]); // Center of India
   const [mapZoom, setMapZoom] = useState(5);
   const [markers, setMarkers] = useState([]);
+  const [liveMarkers, setLiveMarkers] = useState({});
+  const [route, setRoute] = useState([]);
   const [activeField, setActiveField] = useState('source'); // 'source' or 'destination'
+
+  useEffect(() => {
+    const socketUrl = `${window.location.protocol}//${window.location.hostname}:3000/location`;
+    const s = io(socketUrl, { transports: ['websocket', 'polling'] });
+
+    s.on('location_updated', (data) => {
+      setLiveMarkers(prev => ({
+        ...prev,
+        [data.rideId]: { position: [data.lat, data.lng], type: 'live_car' }
+      }));
+    });
+
+    // Join tracking for all in-progress rides we see
+    rides.forEach(ride => {
+      if (ride.status === "In Progress") {
+        s.emit('join_ride_tracking', ride.id);
+      }
+    });
+
+    return () => s.disconnect();
+  }, [rides]);
+
+  const allMarkers = [
+    ...markers,
+    ...Object.values(liveMarkers)
+  ];
+
+  async function fetchRoute(startCoords, endCoords) {
+    if (!startCoords || !endCoords) return;
+    try {
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${startCoords[1]},${startCoords[0]};${endCoords[1]},${endCoords[0]}?overview=full&geometries=geojson`
+      );
+      const data = await response.json();
+      if (data.routes && data.routes.length > 0) {
+        const coords = data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
+        setRoute(coords);
+      }
+    } catch (error) {
+      console.error("Routing error:", error);
+    }
+  }
+
+  useEffect(() => {
+    const sourceMarker = markers.find(m => m.type === 'source');
+    const destMarker = markers.find(m => m.type === 'destination');
+    if (sourceMarker && destMarker) {
+      fetchRoute(sourceMarker.position, destMarker.position);
+    } else {
+      setRoute([]);
+    }
+  }, [markers]);
+  const [suggestions, setSuggestions] = useState({ source: [], destination: [] });
+  const [loadingSuggestions, setLoadingSuggestions] = useState({ source: false, destination: false });
+  const [noResults, setNoResults] = useState({ source: false, destination: false });
+  const dropdownRef = useRef(null);
+  const abortControllerRef = useRef({ source: null, destination: null });
+  const skipSearchRef = useRef({ source: false, destination: false });
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setSuggestions({ source: [], destination: [] });
+        setNoResults({ source: false, destination: false });
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      // Clean up abort controllers
+      if (abortControllerRef.current.source) abortControllerRef.current.source.abort();
+      if (abortControllerRef.current.destination) abortControllerRef.current.destination.abort();
+    };
+  }, []);
+
+  // Debounced suggestion fetch
+  useEffect(() => {
+    if (skipSearchRef.current.source) {
+      skipSearchRef.current.source = false;
+      return;
+    }
+    const delayDebounceFn = setTimeout(() => {
+      if (filters.source.trim().length >= 3) {
+        fetchSuggestions(filters.source, "source");
+      } else {
+        setSuggestions(prev => ({ ...prev, source: [] }));
+        setNoResults(prev => ({ ...prev, source: false }));
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [filters.source]);
+
+  useEffect(() => {
+    if (skipSearchRef.current.destination) {
+      skipSearchRef.current.destination = false;
+      return;
+    }
+    const delayDebounceFn = setTimeout(() => {
+      if (filters.destination.trim().length >= 3) {
+        fetchSuggestions(filters.destination, "destination");
+      } else {
+        setSuggestions(prev => ({ ...prev, destination: [] }));
+        setNoResults(prev => ({ ...prev, destination: false }));
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [filters.destination]);
+
+  async function fetchSuggestions(query, type) {
+    // Cancel previous request for this type
+    if (abortControllerRef.current[type]) {
+      abortControllerRef.current[type].abort();
+    }
+    abortControllerRef.current[type] = new AbortController();
+
+    setLoadingSuggestions(prev => ({ ...prev, [type]: true }));
+    setNoResults(prev => ({ ...prev, [type]: false }));
+    
+    try {
+      // Using Photon API (photon.komoot.io) which is much better for autocomplete/type-ahead
+      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8&location_bias_scale=0.5`;
+      const response = await fetch(url, { signal: abortControllerRef.current[type].signal });
+      
+      if (!response.ok) throw new Error("Network response was not ok");
+      const data = await response.json();
+      
+      if (data && data.features) {
+        // Map Photon features to our expected structure
+        const mappedResults = data.features.map(f => {
+          const p = f.properties;
+          const name = p.name || "";
+          const city = p.city || p.town || p.village || "";
+          const state = p.state || "";
+          const country = p.country || "";
+          
+          // Create a nice display name: "Name, City, State, Country"
+          const parts = [name, city, state, country].filter(part => part && part.length > 0);
+          const displayName = [...new Set(parts)].join(", "); // Remove duplicates and join
+          
+          return {
+            display_name: displayName,
+            lat: f.geometry.coordinates[1],
+            lon: f.geometry.coordinates[0],
+            raw: p // keep original properties just in case
+          };
+        });
+
+        // Filter to prioritize India results if any exist, or just show all
+        const indiaResults = mappedResults.filter(r => r.display_name.toLowerCase().includes("india"));
+        const finalResults = indiaResults.length > 0 ? indiaResults : mappedResults;
+
+        setSuggestions(prev => ({ ...prev, [type]: finalResults }));
+        setNoResults(prev => ({ ...prev, [type]: finalResults.length === 0 }));
+      } else {
+        setSuggestions(prev => ({ ...prev, [type]: [] }));
+        setNoResults(prev => ({ ...prev, [type]: true }));
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') return; // Ignore aborted requests
+      console.error("Suggestions error:", error);
+      setSuggestions(prev => ({ ...prev, [type]: [] }));
+      setNoResults(prev => ({ ...prev, [type]: true }));
+    } finally {
+      setLoadingSuggestions(prev => ({ ...prev, [type]: false }));
+    }
+  }
+
+  function handleSelectSuggestion(suggestion, type) {
+     skipSearchRef.current[type] = true;
+     setFilters(prev => ({ ...prev, [type]: suggestion.display_name }));
+     setSuggestions(prev => ({ ...prev, [type]: [] }));
+     setNoResults(prev => ({ ...prev, [type]: false }));
+    
+    // Also update map marker
+    const coords = [parseFloat(suggestion.lat), parseFloat(suggestion.lon)];
+    setMarkers(current => {
+      const otherField = type === 'source' ? 'destination' : 'source';
+      const otherMarker = current.find(m => m.type === otherField);
+      const newMarkers = [{ 
+        position: coords, 
+        popup: `${type === 'source' ? 'Pickup' : 'Drop-off'}: ${suggestion.display_name}`,
+        type: type
+      }];
+      if (otherMarker) newMarkers.push(otherMarker);
+      return newMarkers;
+    });
+
+    if (type === 'source') {
+      setActiveField('destination');
+    }
+  }
 
   async function getCoordinates(query) {
     if (!query) return null;
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=in`);
       const data = await response.json();
       if (data && data.length > 0) {
         return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
@@ -126,15 +323,14 @@ export default function Dashboard() {
     setFilters(nextFilters);
     
     // Update map markers based on source and destination
+    const [sourceCoords, destCoords] = await Promise.all([
+      nextFilters.source ? getCoordinates(nextFilters.source) : null,
+      nextFilters.destination ? getCoordinates(nextFilters.destination) : null
+    ]);
+
     const newMarkers = [];
-    if (filters.source) {
-      const sourceCoords = await getCoordinates(filters.source);
-      if (sourceCoords) newMarkers.push({ position: sourceCoords, popup: `Pickup: ${filters.source}`, type: 'source' });
-    }
-    if (filters.destination) {
-      const destCoords = await getCoordinates(filters.destination);
-      if (destCoords) newMarkers.push({ position: destCoords, popup: `Drop-off: ${filters.destination}`, type: 'destination' });
-    }
+    if (sourceCoords) newMarkers.push({ position: sourceCoords, popup: `Pickup: ${nextFilters.source}`, type: 'source' });
+    if (destCoords) newMarkers.push({ position: destCoords, popup: `Drop-off: ${nextFilters.destination}`, type: 'destination' });
     setMarkers(newMarkers);
 
     await loadData(nextFilters);
@@ -174,7 +370,7 @@ export default function Dashboard() {
         <div className="uber-sidebar">
           <div className="panel uber-form-panel">
             <h1>Find a trip</h1>
-            <form className="uber-form" onSubmit={submitFilters}>
+            <form className="uber-form" onSubmit={submitFilters} ref={dropdownRef}>
               <div className="uber-input-group">
                 <div className="uber-icon-column">
                   <FaCircle className="icon-pickup" />
@@ -182,22 +378,72 @@ export default function Dashboard() {
                   <FaSquare className="icon-dropoff" />
                 </div>
                 <div className="uber-fields">
-                  <input 
-                    name="source" 
-                    placeholder="Pick-up location" 
-                    value={filters.source} 
-                    onChange={updateFilter} 
-                    onFocus={() => setActiveField('source')}
-                    className={activeField === 'source' ? 'active-input' : ''}
-                  />
-                  <input 
-                    name="destination" 
-                    placeholder="Drop-off location" 
-                    value={filters.destination} 
-                    onChange={updateFilter} 
-                    onFocus={() => setActiveField('destination')}
-                    className={activeField === 'destination' ? 'active-input' : ''}
-                  />
+                  <div className="relative">
+                    <input 
+                      name="source" 
+                      placeholder="Pick-up location" 
+                      value={filters.source} 
+                      onChange={updateFilter} 
+                      onFocus={() => setActiveField('source')}
+                      className={activeField === 'source' ? 'active-input' : ''}
+                      autoComplete="off"
+                    />
+                    {(suggestions.source.length > 0 || loadingSuggestions.source || noResults.source) && activeField === 'source' && (
+                      <div className="suggestions-dropdown">
+                        {loadingSuggestions.source ? (
+                          <div className="suggestion-empty">
+                            <FaSearch className="animate-pulse" />
+                            <span>Searching...</span>
+                          </div>
+                        ) : noResults.source ? (
+                          <div className="suggestion-empty">
+                            <FaRegTimesCircle />
+                            <span>No results for "{filters.source}"</span>
+                          </div>
+                        ) : (
+                          suggestions.source.map((s, i) => (
+                            <div key={i} className="suggestion-item" onClick={() => handleSelectSuggestion(s, 'source')}>
+                              <FaMapMarkerAlt className="suggestion-icon" />
+                              <span className="suggestion-text">{s.display_name}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input 
+                      name="destination" 
+                      placeholder="Drop-off location" 
+                      value={filters.destination} 
+                      onChange={updateFilter} 
+                      onFocus={() => setActiveField('destination')}
+                      className={activeField === 'destination' ? 'active-input' : ''}
+                      autoComplete="off"
+                    />
+                    {(suggestions.destination.length > 0 || loadingSuggestions.destination || noResults.destination) && activeField === 'destination' && (
+                      <div className="suggestions-dropdown">
+                        {loadingSuggestions.destination ? (
+                          <div className="suggestion-empty">
+                            <FaSearch className="animate-pulse" />
+                            <span>Searching...</span>
+                          </div>
+                        ) : noResults.destination ? (
+                          <div className="suggestion-empty">
+                            <FaRegTimesCircle />
+                            <span>No results for "{filters.destination}"</span>
+                          </div>
+                        ) : (
+                          suggestions.destination.map((s, i) => (
+                            <div key={i} className="suggestion-item" onClick={() => handleSelectSuggestion(s, 'destination')}>
+                              <FaMapMarkerAlt className="suggestion-icon" />
+                              <span className="suggestion-text">{s.display_name}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -258,7 +504,8 @@ export default function Dashboard() {
           <MapComponent 
             center={mapCenter} 
             zoom={mapZoom} 
-            markers={markers} 
+            markers={allMarkers} 
+            route={route}
             onMapClick={handleMapClick} 
           />
         </div>

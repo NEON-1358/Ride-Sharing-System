@@ -504,30 +504,59 @@ h2, h3 { margin: 0; }
 }
 .suggestions-dropdown {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 8px);
   left: 0;
   right: 0;
   background: white;
   border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
   z-index: 1000;
-  max-height: 200px;
+  max-height: 280px;
   overflow-y: auto;
-  margin-top: 4px;
+  padding: 0.5rem 0;
 }
 .suggestion-item {
-  padding: 0.8rem 1rem;
-  font-size: 0.85rem;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.9rem;
   cursor: pointer;
-  transition: background 0.2s;
-  border-bottom: 1px solid var(--line);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: var(--page-ink);
+}
+.suggestion-item:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.suggestion-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+.suggestion-item:hover .suggestion-icon {
+  color: var(--accent);
+}
+.suggestion-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.suggestion-item:last-child { border-bottom: none; }
-.suggestion-item:hover { background: #f8f8f8; }
+.suggestion-empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+.suggestion-empty svg {
+  font-size: 1.5rem;
+  opacity: 0.5;
+}
 
 @keyframes slideIn {
   from {
