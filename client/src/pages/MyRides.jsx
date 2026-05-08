@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { acceptBooking, cancelBooking, createReview, createRide, deleteRide, listMyBookings, listRides, rejectBooking, updateRideStatus, updateRideLocation } from "../utils/api";
 import { useToast } from "../context/ToastContext";
 import ChatBox from "../components/ChatBox";
-import { FaMapMarkerAlt, FaSearch, FaRegTimesCircle } from "react-icons/fa";
+import { FaMapMarkerAlt, FaSearch, FaRegTimesCircle, FaCar } from "react-icons/fa";
+import { io } from "socket.io-client";
 
 const createRideState = {
   source: "",
@@ -27,9 +28,40 @@ export default function MyRides() {
   const [loadingSuggestions, setLoadingSuggestions] = useState({ source: false, destination: false });
   const [noResults, setNoResults] = useState({ source: false, destination: false });
   const [isValidating, setIsValidating] = useState(false);
+  const [estimatedPrice, setEstimatedPrice] = useState(null);
+  const [locationSocket, setLocationSocket] = useState(null);
   const dropdownRef = useRef(null);
   const abortControllerRef = useRef({ source: null, destination: null });
   const skipSearchRef = useRef({ source: false, destination: false });
+
+  // Debounced price calculation
+  useEffect(() => {
+    if (rideForm.sourceCoords && rideForm.destinationCoords) {
+      calculatePrice(rideForm.sourceCoords, rideForm.destinationCoords);
+    } else {
+      setEstimatedPrice(null);
+    }
+  }, [rideForm.sourceCoords, rideForm.destinationCoords]);
+
+  async function calculatePrice(start, end) {
+    try {
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${start[0]},${start[1]};${end[0]},${end[1]}?overview=false`
+      );
+      const data = await response.json();
+      if (data.routes && data.routes.length > 0) {
+        const distanceKm = data.routes[0].distance / 1000;
+        const price = Math.round(distanceKm * 5); // ₹5 per km
+        setEstimatedPrice(price);
+        // Automatically update the price field if it's currently 0 or empty
+        if (!rideForm.price || rideForm.price === 0) {
+          setRideForm(prev => ({ ...prev, price }));
+        }
+      }
+    } catch (error) {
+      console.error("Price estimation error:", error);
+    }
+  }
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -407,7 +439,9 @@ export default function MyRides() {
           </div>
           <div className="input-group">
             <input name="price" type="number" min="0" value={rideForm.price} onChange={updateField} required />
-            <small className="muted-text">Price per seat (Recommended: ₹250 - ₹500)</small>
+            <small className="muted-text">
+              Price per seat {estimatedPrice ? `(Suggested: ₹${estimatedPrice})` : "(Recommended: ₹250 - ₹500)"}
+            </small>
           </div>
           <input name="description" placeholder="Description" value={rideForm.description} onChange={updateField} />
           <button type="submit" className="solid-button" disabled={isValidating}>
