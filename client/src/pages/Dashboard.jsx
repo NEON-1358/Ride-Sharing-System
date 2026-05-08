@@ -19,12 +19,40 @@ export default function Dashboard() {
   const [mapCenter, setMapCenter] = useState([22.9734, 78.6569]); // Center of India
   const [mapZoom, setMapZoom] = useState(5);
   const [markers, setMarkers] = useState([]);
+  const [route, setRoute] = useState([]);
   const [activeField, setActiveField] = useState('source'); // 'source' or 'destination'
+
+  async function fetchRoute(startCoords, endCoords) {
+    if (!startCoords || !endCoords) return;
+    try {
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${startCoords[1]},${startCoords[0]};${endCoords[1]},${endCoords[0]}?overview=full&geometries=geojson`
+      );
+      const data = await response.json();
+      if (data.routes && data.routes.length > 0) {
+        const coords = data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
+        setRoute(coords);
+      }
+    } catch (error) {
+      console.error("Routing error:", error);
+    }
+  }
+
+  useEffect(() => {
+    const sourceMarker = markers.find(m => m.type === 'source');
+    const destMarker = markers.find(m => m.type === 'destination');
+    if (sourceMarker && destMarker) {
+      fetchRoute(sourceMarker.position, destMarker.position);
+    } else {
+      setRoute([]);
+    }
+  }, [markers]);
   const [suggestions, setSuggestions] = useState({ source: [], destination: [] });
   const [loadingSuggestions, setLoadingSuggestions] = useState({ source: false, destination: false });
   const [noResults, setNoResults] = useState({ source: false, destination: false });
   const dropdownRef = useRef(null);
   const abortControllerRef = useRef({ source: null, destination: null });
+  const skipSearchRef = useRef({ source: false, destination: false });
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -45,6 +73,10 @@ export default function Dashboard() {
 
   // Debounced suggestion fetch
   useEffect(() => {
+    if (skipSearchRef.current.source) {
+      skipSearchRef.current.source = false;
+      return;
+    }
     const delayDebounceFn = setTimeout(() => {
       if (filters.source.trim().length >= 3) {
         fetchSuggestions(filters.source, "source");
@@ -58,6 +90,10 @@ export default function Dashboard() {
   }, [filters.source]);
 
   useEffect(() => {
+    if (skipSearchRef.current.destination) {
+      skipSearchRef.current.destination = false;
+      return;
+    }
     const delayDebounceFn = setTimeout(() => {
       if (filters.destination.trim().length >= 3) {
         fetchSuggestions(filters.destination, "destination");
@@ -130,9 +166,10 @@ export default function Dashboard() {
   }
 
   function handleSelectSuggestion(suggestion, type) {
-    setFilters(prev => ({ ...prev, [type]: suggestion.display_name }));
-    setSuggestions(prev => ({ ...prev, [type]: [] }));
-    setNoResults(prev => ({ ...prev, [type]: false }));
+     skipSearchRef.current[type] = true;
+     setFilters(prev => ({ ...prev, [type]: suggestion.display_name }));
+     setSuggestions(prev => ({ ...prev, [type]: [] }));
+     setNoResults(prev => ({ ...prev, [type]: false }));
     
     // Also update map marker
     const coords = [parseFloat(suggestion.lat), parseFloat(suggestion.lon)];
@@ -258,15 +295,14 @@ export default function Dashboard() {
     setFilters(nextFilters);
     
     // Update map markers based on source and destination
+    const [sourceCoords, destCoords] = await Promise.all([
+      nextFilters.source ? getCoordinates(nextFilters.source) : null,
+      nextFilters.destination ? getCoordinates(nextFilters.destination) : null
+    ]);
+
     const newMarkers = [];
-    if (filters.source) {
-      const sourceCoords = await getCoordinates(filters.source);
-      if (sourceCoords) newMarkers.push({ position: sourceCoords, popup: `Pickup: ${filters.source}`, type: 'source' });
-    }
-    if (filters.destination) {
-      const destCoords = await getCoordinates(filters.destination);
-      if (destCoords) newMarkers.push({ position: destCoords, popup: `Drop-off: ${filters.destination}`, type: 'destination' });
-    }
+    if (sourceCoords) newMarkers.push({ position: sourceCoords, popup: `Pickup: ${nextFilters.source}`, type: 'source' });
+    if (destCoords) newMarkers.push({ position: destCoords, popup: `Drop-off: ${nextFilters.destination}`, type: 'destination' });
     setMarkers(newMarkers);
 
     await loadData(nextFilters);
@@ -441,6 +477,7 @@ export default function Dashboard() {
             center={mapCenter} 
             zoom={mapZoom} 
             markers={markers} 
+            route={route}
             onMapClick={handleMapClick} 
           />
         </div>
