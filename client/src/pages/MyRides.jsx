@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import { acceptBooking, cancelBooking, createReview, createRide, deleteRide, listMyBookings, listRides, rejectBooking, updateRideStatus } from "../utils/api";
+import { acceptBooking, cancelBooking, createReview, createRide, deleteRide, listMyBookings, listRides, rejectBooking, updateRideStatus, updateRideLocation } from "../utils/api";
 import { useToast } from "../context/ToastContext";
 import ChatBox from "../components/ChatBox";
+import { FaMapMarkerAlt, FaSearch, FaRegTimesCircle } from "react-icons/fa";
 
 const createRideState = {
   source: "",
@@ -24,27 +25,80 @@ export default function MyRides() {
   const [activeChat, setActiveChat] = useState(null);
   const [suggestions, setSuggestions] = useState({ source: [], destination: [] });
   const [loadingSuggestions, setLoadingSuggestions] = useState({ source: false, destination: false });
+  const [noResults, setNoResults] = useState({ source: false, destination: false });
   const [isValidating, setIsValidating] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setSuggestions({ source: [], destination: [] });
+        setNoResults({ source: false, destination: false });
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Debounced suggestion fetch
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (rideForm.source.trim().length >= 3) {
+        fetchSuggestions(rideForm.source, "source");
+      } else {
+        setSuggestions(prev => ({ ...prev, source: [] }));
+        setNoResults(prev => ({ ...prev, source: false }));
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [rideForm.source]);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (rideForm.destination.trim().length >= 3) {
+        fetchSuggestions(rideForm.destination, "destination");
+      } else {
+        setSuggestions(prev => ({ ...prev, destination: [] }));
+        setNoResults(prev => ({ ...prev, destination: false }));
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [rideForm.destination]);
 
   async function fetchSuggestions(query, type) {
-    if (!query || query.trim().length < 3) {
-      setSuggestions(prev => ({ ...prev, [type]: [] }));
-      return;
-    }
-
     setLoadingSuggestions(prev => ({ ...prev, [type]: true }));
+    setNoResults(prev => ({ ...prev, [type]: false }));
+    
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`);
+      // First attempt: Search within India with jsonv2 for better results
+      let response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=8&countrycodes=in&accept-language=en`);
       if (!response.ok) throw new Error("Network response was not ok");
-      const data = await response.json();
+      let data = await response.json();
       
-      // Ensure data is an array
-      if (Array.isArray(data)) {
+      // Second attempt: If no results in India, try global search
+      if (!data || data.length === 0) {
+        response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=8&accept-language=en`);
+        if (response.ok) {
+          data = await response.json();
+        }
+      }
+      
+      if (Array.isArray(data) && data.length > 0) {
         setSuggestions(prev => ({ ...prev, [type]: data }));
+        setNoResults(prev => ({ ...prev, [type]: false }));
+      } else {
+        setSuggestions(prev => ({ ...prev, [type]: [] }));
+        setNoResults(prev => ({ ...prev, [type]: true }));
       }
     } catch (error) {
       console.error("Suggestions error:", error);
+      // If the API call fails (e.g., rate limit), don't immediately show "No results"
+      // unless we're sure it's not a temporary network issue.
       setSuggestions(prev => ({ ...prev, [type]: [] }));
+      setNoResults(prev => ({ ...prev, [type]: true }));
     } finally {
       setLoadingSuggestions(prev => ({ ...prev, [type]: false }));
     }
@@ -64,10 +118,7 @@ export default function MyRides() {
     const { name, value } = event.target;
     setRideForm((current) => ({ ...current, [name]: value }));
 
-    // Real-time suggestions for source and destination
-    if (name === "source" || name === "destination") {
-      fetchSuggestions(value, name);
-    }
+    // Real-time suggestions for source and destination are now handled by useEffect with debounce
 
     // Price Suggestion Logic
     if (name === "source" || name === "destination") {
@@ -119,25 +170,38 @@ export default function MyRides() {
 
     // Verify locations exist in the real world
     setIsValidating(true);
-    showToast("Verifying locations with map...", "info");
-    try {
-      const [srcRes, destRes] = await Promise.all([
-        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(rideForm.source)}&limit=1`),
-        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(rideForm.destination)}&limit=1`)
-      ]);
-      const [srcData, destData] = await Promise.all([srcRes.json(), destRes.json()]);
+    
+    // If we already have coordinates from suggestions, we can skip verification fetch
+    if (rideForm.sourceCoords && rideForm.destinationCoords) {
+      // Proceed to create ride
+    } else {
+      showToast("Verifying locations with map...", "info");
+      try {
+        const [srcRes, destRes] = await Promise.all([
+          fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(rideForm.source)}&limit=1&countrycodes=in`),
+          fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(rideForm.destination)}&limit=1&countrycodes=in`)
+        ]);
+        const [srcData, destData] = await Promise.all([srcRes.json(), destRes.json()]);
 
-      if (!srcData || srcData.length === 0) {
-        setIsValidating(false);
-        return showToast(`Location not found: '${rideForm.source}'. Please select a real address from the suggestions.`, "error");
+        if (!srcData || srcData.length === 0) {
+          setIsValidating(false);
+          return showToast(`Location not found: '${rideForm.source}'. Please select a real address from the suggestions.`, "error");
+        }
+        if (!destData || destData.length === 0) {
+          setIsValidating(false);
+          return showToast(`Location not found: '${rideForm.destination}'. Please select a real address from the suggestions.`, "error");
+        }
+
+        // Update coords if they were missing
+        setRideForm(prev => ({
+          ...prev,
+          sourceCoords: [parseFloat(srcData[0].lon), parseFloat(srcData[0].lat)],
+          destinationCoords: [parseFloat(destData[0].lon), parseFloat(destData[0].lat)]
+        }));
+      } catch (err) {
+        console.error("Verification error:", err);
+        // Fallback: if geocoding is down, we let the server try to handle it
       }
-      if (!destData || destData.length === 0) {
-        setIsValidating(false);
-        return showToast(`Location not found: '${rideForm.destination}'. Please select a real address from the suggestions.`, "error");
-      }
-    } catch (err) {
-      console.error("Verification error:", err);
-      // Fallback: if geocoding is down, we let the server try to handle it
     }
 
     if (rideForm.source.toLowerCase() === rideForm.destination.toLowerCase()) {
@@ -234,6 +298,7 @@ export default function MyRides() {
       [`${type}Coords`]: coords
     }));
     setSuggestions(prev => ({ ...prev, [type]: [] }));
+    setNoResults(prev => ({ ...prev, [type]: false }));
   }
 
   return (
@@ -245,17 +310,26 @@ export default function MyRides() {
             <p>Post a trip with clear details and live seat availability.</p>
           </div>
         </div>
-        <form className="filter-grid" onSubmit={handleCreateRide}>
+        <form className="filter-grid" onSubmit={handleCreateRide} ref={dropdownRef}>
           <div className="relative">
             <input name="source" placeholder="Source" value={rideForm.source} onChange={updateField} required autoComplete="off" />
-            {(suggestions.source.length > 0 || loadingSuggestions.source) && (
+            {(suggestions.source.length > 0 || loadingSuggestions.source || noResults.source) && (
               <div className="suggestions-dropdown">
                 {loadingSuggestions.source ? (
-                  <div className="suggestion-item opacity-50">Searching...</div>
+                  <div className="suggestion-empty">
+                    <FaSearch className="animate-pulse" />
+                    <span>Searching for locations...</span>
+                  </div>
+                ) : noResults.source ? (
+                  <div className="suggestion-empty">
+                    <FaRegTimesCircle />
+                    <span>No results found for "{rideForm.source}"</span>
+                  </div>
                 ) : (
                   suggestions.source.map((s, i) => (
                     <div key={i} className="suggestion-item" onClick={() => handleSelectSuggestion(s, 'source')}>
-                      {s.display_name}
+                      <FaMapMarkerAlt className="suggestion-icon" />
+                      <span className="suggestion-text">{s.display_name}</span>
                     </div>
                   ))
                 )}
@@ -264,14 +338,23 @@ export default function MyRides() {
           </div>
           <div className="relative">
             <input name="destination" placeholder="Destination" value={rideForm.destination} onChange={updateField} required autoComplete="off" />
-            {(suggestions.destination.length > 0 || loadingSuggestions.destination) && (
+            {(suggestions.destination.length > 0 || loadingSuggestions.destination || noResults.destination) && (
               <div className="suggestions-dropdown">
                 {loadingSuggestions.destination ? (
-                  <div className="suggestion-item opacity-50">Searching...</div>
+                  <div className="suggestion-empty">
+                    <FaSearch className="animate-pulse" />
+                    <span>Searching for locations...</span>
+                  </div>
+                ) : noResults.destination ? (
+                  <div className="suggestion-empty">
+                    <FaRegTimesCircle />
+                    <span>No results found for "{rideForm.destination}"</span>
+                  </div>
                 ) : (
                   suggestions.destination.map((s, i) => (
                     <div key={i} className="suggestion-item" onClick={() => handleSelectSuggestion(s, 'destination')}>
-                      {s.display_name}
+                      <FaMapMarkerAlt className="suggestion-icon" />
+                      <span className="suggestion-text">{s.display_name}</span>
                     </div>
                   ))
                 )}

@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { createBooking, listNotifications, listRides, markNotificationsRead } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import MapComponent from "../components/MapComponent";
-import { FaCircle, FaSquare, FaClock, FaUser } from "react-icons/fa";
+import { FaCircle, FaSquare, FaClock, FaUser, FaMapMarkerAlt, FaSearch, FaRegTimesCircle } from "react-icons/fa";
 
 const initialFilters = { source: "", destination: "", dateFrom: "", dateTo: "", seats: "", page: 1, limit: 6 };
 
@@ -20,11 +20,112 @@ export default function Dashboard() {
   const [mapZoom, setMapZoom] = useState(5);
   const [markers, setMarkers] = useState([]);
   const [activeField, setActiveField] = useState('source'); // 'source' or 'destination'
+  const [suggestions, setSuggestions] = useState({ source: [], destination: [] });
+  const [loadingSuggestions, setLoadingSuggestions] = useState({ source: false, destination: false });
+  const [noResults, setNoResults] = useState({ source: false, destination: false });
+  const dropdownRef = useRef(null);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setSuggestions({ source: [], destination: [] });
+        setNoResults({ source: false, destination: false });
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Debounced suggestion fetch
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (filters.source.trim().length >= 3) {
+        fetchSuggestions(filters.source, "source");
+      } else {
+        setSuggestions(prev => ({ ...prev, source: [] }));
+        setNoResults(prev => ({ ...prev, source: false }));
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [filters.source]);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (filters.destination.trim().length >= 3) {
+        fetchSuggestions(filters.destination, "destination");
+      } else {
+        setSuggestions(prev => ({ ...prev, destination: [] }));
+        setNoResults(prev => ({ ...prev, destination: false }));
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [filters.destination]);
+
+  async function fetchSuggestions(query, type) {
+    setLoadingSuggestions(prev => ({ ...prev, [type]: true }));
+    setNoResults(prev => ({ ...prev, [type]: false }));
+    
+    try {
+      // First attempt: Search within India with jsonv2 for better results
+      let response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=8&countrycodes=in&accept-language=en`);
+      if (!response.ok) throw new Error("Network response was not ok");
+      let data = await response.json();
+      
+      // Second attempt: If no results in India, try global search
+      if (!data || data.length === 0) {
+        response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=8&accept-language=en`);
+        if (response.ok) {
+          data = await response.json();
+        }
+      }
+      
+      if (Array.isArray(data) && data.length > 0) {
+        setSuggestions(prev => ({ ...prev, [type]: data }));
+        setNoResults(prev => ({ ...prev, [type]: false }));
+      } else {
+        setSuggestions(prev => ({ ...prev, [type]: [] }));
+        setNoResults(prev => ({ ...prev, [type]: true }));
+      }
+    } catch (error) {
+      console.error("Suggestions error:", error);
+      setSuggestions(prev => ({ ...prev, [type]: [] }));
+      setNoResults(prev => ({ ...prev, [type]: true }));
+    } finally {
+      setLoadingSuggestions(prev => ({ ...prev, [type]: false }));
+    }
+  }
+
+  function handleSelectSuggestion(suggestion, type) {
+    setFilters(prev => ({ ...prev, [type]: suggestion.display_name }));
+    setSuggestions(prev => ({ ...prev, [type]: [] }));
+    setNoResults(prev => ({ ...prev, [type]: false }));
+    
+    // Also update map marker
+    const coords = [parseFloat(suggestion.lat), parseFloat(suggestion.lon)];
+    setMarkers(current => {
+      const otherField = type === 'source' ? 'destination' : 'source';
+      const otherMarker = current.find(m => m.type === otherField);
+      const newMarkers = [{ 
+        position: coords, 
+        popup: `${type === 'source' ? 'Pickup' : 'Drop-off'}: ${suggestion.display_name}`,
+        type: type
+      }];
+      if (otherMarker) newMarkers.push(otherMarker);
+      return newMarkers;
+    });
+
+    if (type === 'source') {
+      setActiveField('destination');
+    }
+  }
 
   async function getCoordinates(query) {
     if (!query) return null;
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=in`);
       const data = await response.json();
       if (data && data.length > 0) {
         return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
@@ -174,7 +275,7 @@ export default function Dashboard() {
         <div className="uber-sidebar">
           <div className="panel uber-form-panel">
             <h1>Find a trip</h1>
-            <form className="uber-form" onSubmit={submitFilters}>
+            <form className="uber-form" onSubmit={submitFilters} ref={dropdownRef}>
               <div className="uber-input-group">
                 <div className="uber-icon-column">
                   <FaCircle className="icon-pickup" />
@@ -182,22 +283,72 @@ export default function Dashboard() {
                   <FaSquare className="icon-dropoff" />
                 </div>
                 <div className="uber-fields">
-                  <input 
-                    name="source" 
-                    placeholder="Pick-up location" 
-                    value={filters.source} 
-                    onChange={updateFilter} 
-                    onFocus={() => setActiveField('source')}
-                    className={activeField === 'source' ? 'active-input' : ''}
-                  />
-                  <input 
-                    name="destination" 
-                    placeholder="Drop-off location" 
-                    value={filters.destination} 
-                    onChange={updateFilter} 
-                    onFocus={() => setActiveField('destination')}
-                    className={activeField === 'destination' ? 'active-input' : ''}
-                  />
+                  <div className="relative">
+                    <input 
+                      name="source" 
+                      placeholder="Pick-up location" 
+                      value={filters.source} 
+                      onChange={updateFilter} 
+                      onFocus={() => setActiveField('source')}
+                      className={activeField === 'source' ? 'active-input' : ''}
+                      autoComplete="off"
+                    />
+                    {(suggestions.source.length > 0 || loadingSuggestions.source || noResults.source) && activeField === 'source' && (
+                      <div className="suggestions-dropdown">
+                        {loadingSuggestions.source ? (
+                          <div className="suggestion-empty">
+                            <FaSearch className="animate-pulse" />
+                            <span>Searching...</span>
+                          </div>
+                        ) : noResults.source ? (
+                          <div className="suggestion-empty">
+                            <FaRegTimesCircle />
+                            <span>No results for "{filters.source}"</span>
+                          </div>
+                        ) : (
+                          suggestions.source.map((s, i) => (
+                            <div key={i} className="suggestion-item" onClick={() => handleSelectSuggestion(s, 'source')}>
+                              <FaMapMarkerAlt className="suggestion-icon" />
+                              <span className="suggestion-text">{s.display_name}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input 
+                      name="destination" 
+                      placeholder="Drop-off location" 
+                      value={filters.destination} 
+                      onChange={updateFilter} 
+                      onFocus={() => setActiveField('destination')}
+                      className={activeField === 'destination' ? 'active-input' : ''}
+                      autoComplete="off"
+                    />
+                    {(suggestions.destination.length > 0 || loadingSuggestions.destination || noResults.destination) && activeField === 'destination' && (
+                      <div className="suggestions-dropdown">
+                        {loadingSuggestions.destination ? (
+                          <div className="suggestion-empty">
+                            <FaSearch className="animate-pulse" />
+                            <span>Searching...</span>
+                          </div>
+                        ) : noResults.destination ? (
+                          <div className="suggestion-empty">
+                            <FaRegTimesCircle />
+                            <span>No results for "{filters.destination}"</span>
+                          </div>
+                        ) : (
+                          suggestions.destination.map((s, i) => (
+                            <div key={i} className="suggestion-item" onClick={() => handleSelectSuggestion(s, 'destination')}>
+                              <FaMapMarkerAlt className="suggestion-icon" />
+                              <span className="suggestion-text">{s.display_name}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

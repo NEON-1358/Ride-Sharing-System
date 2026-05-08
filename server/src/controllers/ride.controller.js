@@ -232,8 +232,16 @@ exports.getRide = async (req, res) => {
 
 async function verifyLocation(name) {
   try {
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(name)}&limit=1`);
-    const data = await response.json();
+    // Attempt 1: India-specific search
+    let response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(name)}&limit=1&countrycodes=in&accept-language=en`);
+    let data = await response.json();
+
+    // Attempt 2: Global search fallback
+    if (!data || data.length === 0) {
+      response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(name)}&limit=1&accept-language=en`);
+      data = await response.json();
+    }
+
     return data && data.length > 0;
   } catch (err) {
     console.error("Geocoding verification error:", err);
