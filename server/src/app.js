@@ -53,7 +53,10 @@ app.use(
         "http://localhost:3000"
       ].filter(Boolean);
       
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow all Vercel preview deployments (urls ending with .vercel.app)
+      const isVercelPreview = origin && origin.endsWith(".vercel.app");
+      
+      if (!origin || allowedOrigins.includes(origin) || isVercelPreview) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
