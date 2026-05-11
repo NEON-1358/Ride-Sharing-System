@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import { createBooking, listNotifications, listRides, markNotificationsRead } from "../utils/api";
+import { createBooking, listNotifications, listRides, markNotificationsRead, SOCKET_BASE } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import MapComponent from "../components/MapComponent";
@@ -25,7 +25,7 @@ export default function Dashboard() {
   const [activeField, setActiveField] = useState('source'); // 'source' or 'destination'
 
   useEffect(() => {
-    const socketUrl = `${window.location.protocol}//${window.location.hostname}:3000/location`;
+    const socketUrl = `${SOCKET_BASE}/location`;
     const s = io(socketUrl, { transports: ['websocket', 'polling'] });
 
     s.on('location_updated', (data) => {
