@@ -18,6 +18,9 @@ const chatRoutes = require("./routes/chat.routes");
 
 const app = express();
 
+// Trust Render's reverse proxy
+app.set("trust proxy", 1);
+
 // Global Rate Limiting
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
