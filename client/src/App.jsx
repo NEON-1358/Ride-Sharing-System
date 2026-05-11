@@ -5,6 +5,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuth } from "./context/AuthContext";
 import { useToast } from "./context/ToastContext";
 import { io } from "socket.io-client";
+import { SOCKET_BASE } from "./utils/api";
 import Admin from "./pages/Admin";
 import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
@@ -22,7 +23,7 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated || !token) return;
 
-    const socketUrl = `${window.location.protocol}//${window.location.hostname}:3000/chat`;
+    const socketUrl = `${SOCKET_BASE}/chat`;
     const socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       auth: { token }

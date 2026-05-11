@@ -4,7 +4,17 @@ const getApiBase = () => {
   return `${window.location.protocol}//${window.location.hostname}:3000/api`;
 };
 
+const getSocketBase = () => {
+  if (import.meta.env.VITE_API_BASE_URL) {
+    // Remove /api from the end if present
+    return import.meta.env.VITE_API_BASE_URL.replace(/\/api$/, '');
+  }
+  // Fallback to current hostname but on port 3000
+  return `${window.location.protocol}//${window.location.hostname}:3000`;
+};
+
 const API_BASE = getApiBase();
+const SOCKET_BASE = getSocketBase();
 const TOKEN_KEY = "rideshare_token";
 
 export function getToken() {
@@ -155,3 +165,5 @@ export function listAdminOverview() {
 export function getGoogleAuthUrl(from = "login") {
   return `${API_BASE}/auth/google?from=${from}`;
 }
+
+export { SOCKET_BASE, API_BASE };

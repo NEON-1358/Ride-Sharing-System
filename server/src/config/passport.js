@@ -36,7 +36,9 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID || "placeholder_google_client_id",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "placeholder_google_client_secret",
-      callbackURL: "/api/auth/google/callback",
+      callbackURL: process.env.NODE_ENV === "production" 
+        ? `${process.env.RENDER_EXTERNAL_URL || "https://ride-sharing-system-0vyd.onrender.com"}/api/auth/google/callback`
+        : "/api/auth/google/callback",
       proxy: true,
     },
     async (_accessToken, _refreshToken, profile, done) => {

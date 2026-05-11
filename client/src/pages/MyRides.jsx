@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import { acceptBooking, cancelBooking, createReview, createRide, deleteRide, listMyBookings, listRides, rejectBooking, updateRideStatus, updateRideLocation } from "../utils/api";
+import { acceptBooking, cancelBooking, createReview, createRide, deleteRide, listMyBookings, listRides, rejectBooking, updateRideStatus, updateRideLocation, SOCKET_BASE } from "../utils/api";
 import { useToast } from "../context/ToastContext";
 import ChatBox from "../components/ChatBox";
 import { FaMapMarkerAlt, FaSearch, FaRegTimesCircle, FaCar } from "react-icons/fa";
@@ -201,7 +201,7 @@ export default function MyRides() {
   }
 
   useEffect(() => {
-    const socketUrl = `${window.location.protocol}//${window.location.hostname}:3000/location`;
+    const socketUrl = `${SOCKET_BASE}/location`;
     const s = io(socketUrl, { transports: ['websocket', 'polling'] });
     setLocationSocket(s);
     return () => s.disconnect();

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
-import { getChatHistory } from '../utils/api';
+import { getChatHistory, SOCKET_BASE } from '../utils/api';
 
 const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }) => {
   const { user, token } = useAuth();
@@ -36,7 +36,7 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
     };
     fetchHistory();
 
-    const socketUrl = `${window.location.protocol}//${window.location.hostname}:3000/chat`;
+    const socketUrl = `${SOCKET_BASE}/chat`;
     console.log("Connecting to socket:", socketUrl);
     const s = io(socketUrl, {
       transports: ['websocket', 'polling'],

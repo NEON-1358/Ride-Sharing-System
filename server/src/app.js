@@ -18,6 +18,9 @@ const chatRoutes = require("./routes/chat.routes");
 
 const app = express();
 
+// Trust Render's reverse proxy
+app.set("trust proxy", 1);
+
 // Global Rate Limiting
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -42,7 +45,23 @@ app.use("/api/auth/signup", authLimiter);
 
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: (origin, callback) => {
+      const allowedOrigins = [
+        process.env.FRONTEND_URL,
+        "https://ride-sharing-system-ten.vercel.app",
+        "http://localhost:5173",
+        "http://localhost:3000"
+      ].filter(Boolean);
+      
+      // Allow all Vercel preview deployments (urls ending with .vercel.app)
+      const isVercelPreview = origin && origin.endsWith(".vercel.app");
+      
+      if (!origin || allowedOrigins.includes(origin) || isVercelPreview) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
