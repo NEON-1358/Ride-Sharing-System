@@ -166,4 +166,8 @@ export function getGoogleAuthUrl(from = "login") {
   return `${API_BASE}/auth/google?from=${from}`;
 }
 
+export function deleteProfile() {
+  return request("/auth/profile", { method: "DELETE" });
+}
+
 export { SOCKET_BASE, API_BASE };

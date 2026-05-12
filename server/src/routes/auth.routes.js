@@ -35,5 +35,6 @@ router.get(
 router.get("/me", authMiddleware, authController.getMe);
 router.get("/profile/:userId", authMiddleware, authController.getProfile);
 router.put("/profile", authMiddleware, upload.single("profilePicture"), authController.updateProfile);
+router.delete("/profile", authMiddleware, authController.deleteProfile);
 
 module.exports = router;

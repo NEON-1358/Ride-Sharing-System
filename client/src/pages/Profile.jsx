@@ -1,13 +1,14 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
-import { updateProfile, getProfile } from "../utils/api";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { updateProfile, getProfile, deleteProfile } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 
 export default function Profile() {
   const { userId } = useParams();
-  const { user: currentUser, reviews: currentReviews, refreshUser } = useAuth();
+  const { user: currentUser, reviews: currentReviews, refreshUser, logout } = useAuth();
   const { showToast } = useToast();
+  const navigate = useNavigate();
 
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -16,6 +17,8 @@ export default function Profile() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [profilePicture, setProfilePicture] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const isOwnProfile = !userId || userId === currentUser?.id;
 
@@ -58,6 +61,7 @@ export default function Profile() {
     if (password) payload.append("password", password);
     if (profilePicture) payload.append("profilePicture", profilePicture);
 
+    setIsUpdating(true);
     try {
       await updateProfile(payload);
       await refreshUser();
@@ -66,6 +70,26 @@ export default function Profile() {
       showToast("Profile updated successfully.");
     } catch (error) {
       showToast(error.message, 'error');
+    } finally {
+      setIsUpdating(false);
+    }
+  }
+
+  async function handleDeleteProfile() {
+    if (!window.confirm("Are you sure you want to delete your profile? This action cannot be undone!")) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteProfile();
+      logout();
+      navigate("/");
+      showToast("Profile deleted successfully.");
+    } catch (error) {
+      showToast(error.message, 'error');
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -150,7 +174,20 @@ export default function Profile() {
                 <span>Profile picture</span>
                 <input type="file" accept="image/*" onChange={(event) => setProfilePicture(event.target.files?.[0] || null)} />
               </label>
-              <button type="submit" className="solid-button">Save changes</button>
+              <div className="button-group" style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button type="submit" className="solid-button" disabled={isUpdating}>
+                  {isUpdating ? "Updating..." : "Save changes"}
+                </button>
+                <button 
+                  type="button" 
+                  className="ghost-button" 
+                  style={{ color: 'var(--danger)' }} 
+                  onClick={handleDeleteProfile}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Delete profile"}
+                </button>
+              </div>
             </form>
           </div>
         )}
