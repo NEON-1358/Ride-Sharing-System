@@ -170,3 +170,20 @@ exports.updateProfile = async (req, res) => {
     return res.status(500).json({ message: "Unable to update your profile right now.", error: error.message });
   }
 };
+
+exports.deleteProfile = async (req, res) => {
+  try {
+    const user = await User.findOneAndDelete({ publicId: req.user.publicId });
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    
+    // Also delete all related data (reviews, rides, bookings, etc.)
+    // For now, we'll just delete the user
+    return res.json({ message: "Profile deleted successfully." });
+  } catch (error) {
+    console.error("deleteProfile error:", error);
+    return res.status(500).json({ message: "Unable to delete your profile right now." });
+  }
+};

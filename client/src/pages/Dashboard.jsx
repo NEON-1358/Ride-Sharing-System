@@ -19,7 +19,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [mapCenter, setMapCenter] = useState([22.9734, 78.6569]); // Center of India
   const [mapZoom, setMapZoom] = useState(5);
-  const [markers, setMarkers] = useState([]);
+  const [searchMarkers, setSearchMarkers] = useState([]); // Separate state for search markers
+  const [rideMarkers, setRideMarkers] = useState([]); // Separate state for ride markers
   const [liveMarkers, setLiveMarkers] = useState({});
   const [route, setRoute] = useState([]);
   const [activeField, setActiveField] = useState('source'); // 'source' or 'destination'
@@ -46,7 +47,8 @@ export default function Dashboard() {
   }, [rides]);
 
   const allMarkers = [
-    ...markers,
+    ...searchMarkers,
+    ...rideMarkers,
     ...Object.values(liveMarkers)
   ];
 
@@ -67,14 +69,14 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
-    const sourceMarker = markers.find(m => m.type === 'source');
-    const destMarker = markers.find(m => m.type === 'destination');
+    const sourceMarker = searchMarkers.find(m => m.type === 'source');
+    const destMarker = searchMarkers.find(m => m.type === 'destination');
     if (sourceMarker && destMarker) {
       fetchRoute(sourceMarker.position, destMarker.position);
     } else {
       setRoute([]);
     }
-  }, [markers]);
+  }, [searchMarkers]);
   const [suggestions, setSuggestions] = useState({ source: [], destination: [] });
   const [loadingSuggestions, setLoadingSuggestions] = useState({ source: false, destination: false });
   const [noResults, setNoResults] = useState({ source: false, destination: false });
@@ -201,7 +203,7 @@ export default function Dashboard() {
     
     // Also update map marker
     const coords = [parseFloat(suggestion.lat), parseFloat(suggestion.lon)];
-    setMarkers(current => {
+    setSearchMarkers(current => {
       const otherField = type === 'source' ? 'destination' : 'source';
       const otherMarker = current.find(m => m.type === otherField);
       const newMarkers = [{ 
@@ -255,7 +257,7 @@ export default function Dashboard() {
       [activeField]: address
     }));
 
-    setMarkers(current => {
+    setSearchMarkers(current => {
       const otherField = activeField === 'source' ? 'destination' : 'source';
       const otherMarker = current.find(m => m.type === otherField);
       const newMarkers = [{ 
@@ -303,13 +305,13 @@ export default function Dashboard() {
 
   useEffect(() => {
     // Show rides on map
-    const rideMarkers = rides.map(ride => ({
+    const newRideMarkers = rides.map(ride => ({
       position: ride.currentLocation ? [ride.currentLocation[1], ride.currentLocation[0]] : null,
       popup: `Ride: ${ride.source} to ${ride.destination} (${ride.status})`,
       type: ride.status === "In Progress" ? 'active_ride' : 'ride'
     })).filter(m => m.position);
     
-    setMarkers(rideMarkers);
+    setRideMarkers(newRideMarkers);
   }, [rides]);
 
   function updateFilter(event) {
@@ -331,7 +333,7 @@ export default function Dashboard() {
     const newMarkers = [];
     if (sourceCoords) newMarkers.push({ position: sourceCoords, popup: `Pickup: ${nextFilters.source}`, type: 'source' });
     if (destCoords) newMarkers.push({ position: destCoords, popup: `Drop-off: ${nextFilters.destination}`, type: 'destination' });
-    setMarkers(newMarkers);
+    setSearchMarkers(newMarkers);
 
     await loadData(nextFilters);
   }
