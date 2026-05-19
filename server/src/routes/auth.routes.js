@@ -19,6 +19,7 @@ router.get("/google", (req, res, next) => {
     scope: ["profile", "email"],
     session: false,
     state: from || "login",
+    prompt: "select_account",
   })(req, res, next);
 });
 
