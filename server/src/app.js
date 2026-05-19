@@ -3,7 +3,13 @@ const path = require("path");
 const cors = require("cors");
 const session = require("express-session");
 const rateLimit = require("express-rate-limit");
-require("dotenv").config();
+
+// Load .env.local first if it exists (for local development)
+const envLocalPath = path.resolve(__dirname, "../.env.local");
+const envPath = path.resolve(__dirname, "../.env");
+
+require("dotenv").config({ path: envLocalPath });
+require("dotenv").config({ path: envPath });
 const { connectMongo } = require("./config/db");
 const passport = require("./config/passport");
 
