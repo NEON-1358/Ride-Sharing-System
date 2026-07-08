@@ -16,7 +16,7 @@ export default function Header() {
     <header className="topbar">
       <Link to={isAuthenticated ? "/dashboard" : "/"} className="brand">
         <span className="brand-mark"><FaCarSide /></span>
-        <span className="brand-text">CarPool Hub</span>
+        <span className="brand-text">CoRide</span>
       </Link>
       <nav className="nav">
         {isAuthenticated ? (

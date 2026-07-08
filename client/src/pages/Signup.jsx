@@ -50,7 +50,7 @@ export default function Signup() {
     <div className="page-shell auth-shell">
       <form className="panel auth-panel" onSubmit={handleSubmit}>
         <p className="eyebrow">Create account</p>
-        <h1>Join CarPool Hub</h1>
+        <h1>Join CoRide</h1>
         <p className="muted-text">Add a profile picture now or update it later from your profile.</p>
         <label>
           <span>Full name</span>

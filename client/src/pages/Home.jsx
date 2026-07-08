@@ -8,7 +8,7 @@ export default function Home() {
       <section className="marketing-hero">
         <div className="hero-content">
           <p className="eyebrow">Shared rides, cleaner coordination</p>
-          <h1>CarPool Hub</h1>
+          <h1>CoRide</h1>
           <p className="hero-copy">
             Plan a shared trip, reserve a seat, chat with the driver, and follow every booking from request to arrival.
           </p>
