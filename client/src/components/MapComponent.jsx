@@ -20,12 +20,12 @@ L.Icon.Default.mergeOptions({
 // Create a custom car icon using Leaflet.divIcon
 const carIconHtml = renderToString(
   <div style={{ 
-    color: '#165d4a', 
+    color: '#0f766e', 
     fontSize: '24px', 
     backgroundColor: 'white', 
     borderRadius: '50%', 
     padding: '4px',
-    boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+    boxShadow: '0 8px 18px rgba(15,23,42,0.24)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center'
@@ -75,7 +75,7 @@ export default function MapComponent({ center = [22.9734, 78.6569], zoom = 5, ma
     <MapContainer 
       center={center} 
       zoom={zoom} 
-      style={{ height: "100%", width: "100%", borderRadius: "28px" }}
+      style={{ height: "100%", width: "100%", borderRadius: "8px" }}
       scrollWheelZoom={true}
     >
       <ChangeView center={center} zoom={zoom} markers={displayMarkers} route={route} />
@@ -89,7 +89,7 @@ export default function MapComponent({ center = [22.9734, 78.6569], zoom = 5, ma
       {route && route.length > 0 && (
         <Polyline 
           positions={route} 
-          color="#165d4a" 
+          color="#0f766e" 
           weight={5} 
           opacity={0.7}
           lineJoin="round"

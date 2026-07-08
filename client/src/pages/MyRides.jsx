@@ -450,7 +450,7 @@ export default function MyRides() {
           <div className="input-group">
             <input name="price" type="number" min="0" value={rideForm.price} onChange={updateField} required />
             <small className="muted-text">
-              Price per seat {estimatedPrice ? `(Suggested: ₹${estimatedPrice})` : "(Recommended: ₹250 - ₹500)"}
+              Price per seat {estimatedPrice ? `(Suggested: INR ${estimatedPrice})` : "(Recommended: INR 250 - INR 500)"}
             </small>
           </div>
           <input name="description" placeholder="Description" value={rideForm.description} onChange={updateField} />
@@ -548,7 +548,7 @@ export default function MyRides() {
                 <div className="ride-meta">
                   <span>{booking.seats} seat(s)</span>
                   {booking.status === "Completed" && (
-                    <span className="accent-text">Fare: ₹{booking.finalFare} ({booking.paymentStatus})</span>
+                    <span className="accent-text">Fare: INR {booking.finalFare} ({booking.paymentStatus})</span>
                   )}
                   <span>Driver: <Link to={`/profile/${booking.ride?.creator?.id}`} className="user-link">{booking.ride?.creator?.name}</Link></span>
                 </div>

@@ -345,6 +345,7 @@ export default function Dashboard() {
   }
 
   const [selectedSeats, setSelectedSeats] = useState({});
+  const unreadCount = notifications.filter((item) => !item.read).length;
 
   async function handleBook(rideId) {
     const seats = selectedSeats[rideId] || 1;
@@ -368,10 +369,37 @@ export default function Dashboard() {
 
   return (
     <div className="page-shell">
+      <section className="dashboard-hero">
+        <div>
+          <p className="eyebrow">Ride command center</p>
+          <h1>Good to see you, {user?.name?.split(" ")[0] || "there"}.</h1>
+          <p className="muted-text">Search routes, compare seats, book rides, and keep up with driver updates from one focused workspace.</p>
+        </div>
+        <div className="dashboard-summary">
+          <div>
+            <span>Available results</span>
+            <strong>{pagination.total}</strong>
+          </div>
+          <div>
+            <span>Notifications</span>
+            <strong>{unreadCount}</strong>
+          </div>
+          <div>
+            <span>Your rating</span>
+            <strong>{user?.ratings?.average?.toFixed(1) || "0.0"}</strong>
+          </div>
+        </div>
+      </section>
+
       <section className="uber-container">
         <div className="uber-sidebar">
           <div className="panel uber-form-panel">
-            <h1>Find a trip</h1>
+            <div className="panel-heading compact-heading">
+              <div>
+                <p className="eyebrow">Search</p>
+                <h2>Find a trip</h2>
+              </div>
+            </div>
             <form className="uber-form" onSubmit={submitFilters} ref={dropdownRef}>
               <div className="uber-input-group">
                 <div className="uber-icon-column">
@@ -450,7 +478,7 @@ export default function Dashboard() {
               </div>
 
               <div className="map-hint">
-                {activeField === 'source' ? '📍 Click map to set Pickup' : '🏁 Click map to set Drop-off'}
+                {activeField === 'source' ? 'Click the map to set pickup' : 'Click the map to set drop-off'}
               </div>
 
               <div className="uber-select-group">
@@ -485,18 +513,30 @@ export default function Dashboard() {
                   <h3>{ride.source} to {ride.destination}</h3>
                   <p className="ride-time">{new Date(ride.departureTime).toLocaleString()}</p>
                   <div className="ride-meta">
-                    <span>{ride.availableSeats} seats • INR {ride.price}</span>
+                    <span>{ride.availableSeats} seats - INR {ride.price}</span>
                     <Link to={`/profile/${ride.creator?.id}`} className="user-link">{ride.creator?.name}</Link>
                   </div>
                 </div>
-                <button 
-                  type="button" 
-                  className="solid-button mini" 
-                  onClick={() => handleBook(ride.id)}
-                  disabled={!ride.permissions.canBook}
-                >
-                  {ride.permissions.hasBooked ? "Booked" : "Book"}
-                </button>
+                <div className="ride-booking-controls">
+                  <select
+                    aria-label="Seats to book"
+                    value={selectedSeats[ride.id] || 1}
+                    onChange={(event) => updateSelectedSeats(ride.id, event.target.value)}
+                    disabled={!ride.permissions.canBook}
+                  >
+                    {Array.from({ length: Math.max(1, Math.min(ride.availableSeats, 4)) }, (_, index) => index + 1).map((seatCount) => (
+                      <option key={seatCount} value={seatCount}>{seatCount} seat{seatCount > 1 ? "s" : ""}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="solid-button mini"
+                    onClick={() => handleBook(ride.id)}
+                    disabled={!ride.permissions.canBook}
+                  >
+                    {ride.permissions.hasBooked ? "Booked" : "Book"}
+                  </button>
+                </div>
               </article>
             ))}
           </div>
@@ -513,12 +553,33 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* Keep original hero section for stats or remove if preferred */}
       <section className="hero-panel stats-only">
         <div className="stat-grid">
-          <div className="stat-card"><span>Joined</span><strong>{new Date(user.joinedAt).toLocaleDateString()}</strong></div>
-          <div className="stat-card"><span>Total rides</span><strong>{user.totalRidesParticipated}</strong></div>
-          <div className="stat-card"><span>Rating</span><strong>{user.ratings.average.toFixed(1)} / 5</strong></div>
+          <div className="stat-card"><span>Joined</span><strong>{new Date(user?.joinedAt).toLocaleDateString()}</strong></div>
+          <div className="stat-card"><span>Total rides</span><strong>{user?.totalRidesParticipated}</strong></div>
+          <div className="stat-card"><span>Rating</span><strong>{user?.ratings?.average?.toFixed(1)} / 5</strong></div>
+        </div>
+      </section>
+
+      <section className="panel notification-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Updates</p>
+            <h2>Recent notifications</h2>
+          </div>
+          <button type="button" className="ghost-button" onClick={handleReadNotifications} disabled={notifications.length === 0}>
+            Mark read
+          </button>
+        </div>
+        <div className="notification-list">
+          {notifications.length === 0 ? <p className="muted-text">No notifications yet.</p> : null}
+          {notifications.slice(0, 5).map((notification) => (
+            <article key={notification.id} className={`notification-item ${notification.read ? "" : "unread"}`}>
+              <strong>{notification.title || "Update"}</strong>
+              <p>{notification.message || notification.text}</p>
+              {notification.createdAt ? <span>{new Date(notification.createdAt).toLocaleString()}</span> : null}
+            </article>
+          ))}
         </div>
       </section>
     </div>

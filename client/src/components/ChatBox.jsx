@@ -167,15 +167,15 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
       <div className="chat-box">
         <div className="chat-header">
           <div>
-            <h3 className="text-white">Chat with {chatPartnerName}</h3>
-            <p className="text-xs opacity-75">Private Booking Chat</p>
+            <h3>Chat with {chatPartnerName}</h3>
+            <p className="chat-meta">Private booking chat</p>
           </div>
-          <button className="close-chat" onClick={onClose}>&times;</button>
+          <button className="close-chat" onClick={onClose} type="button" aria-label="Close chat">&times;</button>
         </div>
-        
+
         <div className="chat-messages">
           {messages.length === 0 && (
-            <div className="text-center py-10 opacity-50 text-sm">
+            <div className="chat-empty">
               No messages yet. Say hello!
             </div>
           )}
@@ -184,16 +184,16 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
               key={i} 
               className={`msg ${String(msg.from) === String(currentUserId) ? 'msg-sent' : 'msg-received'}`}
             >
-              <div className="text-[10px] opacity-70 mb-1">{msg.fromName}</div>
-              {msg.text}
+              <div className="chat-message-author">{msg.fromName}</div>
+              <div>{msg.text}</div>
             </div>
           ))}
           {partnerTyping && (
-            <div className="msg msg-received !bg-transparent !border-none !py-1 !px-0">
+            <div className="typing-block">
               <div className="typing-indicator">
                 <span></span><span></span><span></span>
               </div>
-              <small className="opacity-50 text-[10px] ml-1">{partnerTyping} is typing...</small>
+              <div className="typing-label">{partnerTyping} is typing...</div>
             </div>
           )}
           <div ref={scrollRef} />
@@ -204,12 +204,12 @@ const ChatBox = ({ bookingId, rideOwnerId, rideOwnerName, passengerId, onClose }
             type="text"
             value={input}
             onChange={handleInputChange}
-            placeholder="Type a message..."
-            className="flex-1"
+            placeholder="Write a message..."
+            className="chat-input"
           />
           <button 
             type="submit"
-            className="solid-button !py-2 !px-4"
+            className="solid-button chat-send"
             disabled={!input.trim()}
           >
             Send

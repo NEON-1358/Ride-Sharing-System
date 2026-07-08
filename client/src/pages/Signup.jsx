@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { getGoogleAuthUrl } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import { FaEye, FaEyeSlash } from "react-icons/fa6";
 
 export default function Signup() {
   const { signup } = useAuth();
@@ -74,7 +75,7 @@ export default function Signup() {
               className="password-toggle" 
               onClick={() => setShowPassword(!showPassword)}
             >
-              {showPassword ? "👁️" : "👁️‍🗨️"}
+              {showPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
           </div>
         </label>
@@ -93,7 +94,7 @@ export default function Signup() {
               className="password-toggle" 
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
             >
-              {showConfirmPassword ? "👁️" : "👁️‍🗨️"}
+              {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
           </div>
         </label>

@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { updateProfile, getProfile, deleteProfile } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import { FaEye, FaEyeSlash } from "react-icons/fa6";
 
 export default function Profile() {
   const { userId } = useParams();
@@ -154,7 +155,7 @@ export default function Profile() {
                     className="password-toggle" 
                     onClick={() => setShowPassword(!showPassword)}
                   >
-                    {showPassword ? "👁️" : "👁️‍🗨️"}
+                    {showPassword ? <FaEyeSlash /> : <FaEye />}
                   </button>
                 </div>
               </label>

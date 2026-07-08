@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getGoogleAuthUrl } from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import { FaEye, FaEyeSlash } from "react-icons/fa6";
 
 export default function Login() {
   const { login } = useAuth();
@@ -53,7 +54,7 @@ export default function Login() {
               onClick={() => setShowPassword(!showPassword)}
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
-              {showPassword ? "👁️" : "👁️‍🗨️"}
+              {showPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
           </div>
         </label>
