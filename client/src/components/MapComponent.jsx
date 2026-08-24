@@ -79,12 +79,26 @@ export default function MapComponent({ center = [22.9734, 78.6569], zoom = 5, ma
 
   return (
     <MapContainer 
-      center={center} 
-      zoom={zoom} 
-      style={{ height: "100%", width: "100%", borderRadius: "8px" }}
-      scrollWheelZoom={true}
-    >
-      <ChangeView center={center} zoom={zoom} markers={displayMarkers} route={route} />
+  center={center}
+  zoom={zoom}
+  style={{
+    height: "100%",
+    width: "100%",
+    borderRadius: "8px"
+  }}
+  scrollWheelZoom={true}
+  dragging={true}
+  doubleClickZoom={true}
+  touchZoom={true}
+  boxZoom={false}
+  keyboard={true}
+>
+<ChangeView
+  center={center}
+  zoom={zoom}
+  route={route}
+  autoFit={!onMapClick}
+/>
       <MapEvents onMapClick={onMapClick} />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
