@@ -14,18 +14,32 @@ async function authMiddleware(req, res, next) {
   }
 
   try {
-    const payload = jwt.verify(token, secret);
-    const user = await User.findOne({ publicId: payload.sub });
-    if (!user) {
-      return res.status(401).json({ message: "Session is no longer valid." });
-    }
+  const payload = jwt.verify(token, secret);
 
-    req.auth = payload;
-    req.user = user;
-    return next();
-  } catch (_error) {
-    return res.status(401).json({ message: "Invalid or expired token." });
+  const User = getUserModel();
+
+  const user = User
+    ? await User.findOne({ publicId: payload.sub })
+    : await userStore.findByPublicId(payload.sub);
+
+  if (!user) {
+    return res.status(401).json({
+      message: "Session is no longer valid."
+    });
   }
+
+  req.auth = payload;
+  req.user = user;
+
+  return next();
+
+} catch (error) {
+  console.error("Auth middleware error:", error);
+
+  return res.status(401).json({
+    message: "Invalid or expired token."
+  });
+}
 }
 
 async function optionalAuth(req, res, next) {
@@ -38,15 +52,22 @@ async function optionalAuth(req, res, next) {
   }
 
   try {
-    const payload = jwt.verify(token, secret);
-    const user = await User.findOne({ publicId: payload.sub });
-    if (user) {
-      req.auth = payload;
-      req.user = user;
-    }
-  } catch (_error) {
-    // Ignore invalid tokens for optional auth
+  const payload = jwt.verify(token, secret);
+
+  const User = getUserModel();
+
+  const user = User
+    ? await User.findOne({ publicId: payload.sub })
+    : await userStore.findByPublicId(payload.sub);
+
+  if (user) {
+    req.auth = payload;
+    req.user = user;
   }
+
+} catch (_error) {
+  // Ignore invalid tokens for optional auth
+}
   return next();
 }
 

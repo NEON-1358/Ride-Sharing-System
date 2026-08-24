@@ -99,9 +99,6 @@ const UserSchema = new mongoose.Schema(
   { timestamps: true, strict: false }
 );
 
-UserSchema.index({ email: 1 });
-UserSchema.index({ googleId: 1 });
-
 const UserModel = mongoose.models.User || mongoose.model("User", UserSchema);
 
 function getUserModel() {
