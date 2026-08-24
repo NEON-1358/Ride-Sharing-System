@@ -144,11 +144,20 @@ exports.listRides = async (req, res) => {
     query.destination = { $regex: req.query.destination.trim(), $options: "i" };
   }
 
-  if (req.query.dateFrom || req.query.dateTo) {
-    query.departureTime = {};
-    if (req.query.dateFrom) query.departureTime.$gte = new Date(req.query.dateFrom);
-    if (req.query.dateTo) query.departureTime.$lte = new Date(req.query.dateTo);
+if (req.query.dateFrom || req.query.dateTo) {
+  query.departureTime = {};
+
+  if (req.query.dateFrom) {
+    query.departureTime.$gte = new Date(req.query.dateFrom);
   }
+
+  if (req.query.dateTo) {
+    query.departureTime.$lte = new Date(req.query.dateTo);
+  }
+} else {
+  // Never show rides that have already departed
+  query.departureTime = { $gte: new Date() };
+}
 
   if (req.query.seats) {
     query.availableSeats = { $gte: Number(req.query.seats) };

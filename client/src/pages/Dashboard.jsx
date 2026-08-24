@@ -14,6 +14,9 @@ export default function Dashboard() {
   const { showToast } = useToast();
   const [filters, setFilters] = useState(initialFilters);
   const [rides, setRides] = useState([]);
+  const [searchDate, setSearchDate] = useState("");
+  const [searchFromTime, setSearchFromTime] = useState("");
+  const [searchToTime, setSearchToTime] = useState("");
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -319,9 +322,39 @@ export default function Dashboard() {
     setFilters((current) => ({ ...current, [name]: value }));
   }
 
+  function buildDateTimeRange() {
+  if (!searchDate) {
+    return {
+      dateFrom: "",
+      dateTo: "",
+    };
+  }
+
+  const fromTime = searchFromTime || "00:00";
+  const toTime = searchToTime || "23:59";
+
+  return {
+    dateFrom: `${searchDate}T${fromTime}`,
+    dateTo: `${searchDate}T${toTime}`,
+  };
+}
+
   async function submitFilters(event) {
-    event.preventDefault();
-    const nextFilters = { ...filters, page: 1 };
+  event.preventDefault();
+
+  if (searchFromTime && searchToTime && searchFromTime > searchToTime) {   // checking time authentication
+  showToast("The 'Until' time must be after the 'From' time.", "error");
+  return;
+}
+
+  const { dateFrom, dateTo } = buildDateTimeRange();
+
+  const nextFilters = {
+    ...filters,
+    dateFrom,
+    dateTo,
+    page: 1
+  };
     setFilters(nextFilters);
     
     // Update map markers based on source and destination
@@ -337,6 +370,8 @@ export default function Dashboard() {
 
     await loadData(nextFilters);
   }
+
+  
 
   async function changePage(nextPage) {
     const nextFilters = { ...filters, page: nextPage };
@@ -482,23 +517,69 @@ export default function Dashboard() {
               </div>
 
               <div className="uber-select-group">
-                <div className="uber-select-item">
-                  <FaClock />
-                  <select name="dateFrom" onChange={updateFilter}>
-                    <option value="">Pick up now</option>
-                    {/* Add more options or a date picker here if needed */}
-                  </select>
-                </div>
-                <div className="uber-select-item">
-                  <FaUser />
-                  <select name="seats" value={filters.seats} onChange={updateFilter}>
-                    <option value="1">For me (1)</option>
-                    <option value="2">2 passengers</option>
-                    <option value="3">3 passengers</option>
-                    <option value="4">4 passengers</option>
-                  </select>
-                </div>
-              </div>
+
+  <div className="uber-select-item">
+    <FaClock />
+
+    <div className="date-time-controls">
+      <label htmlFor="searchDate">Date</label>
+
+      <input
+        id="searchDate"
+        type="date"
+        value={searchDate}
+        min={new Date().toISOString().split("T")[0]}
+        onChange={(e) => setSearchDate(e.target.value)}
+      />
+    </div>
+  </div>
+
+  <div className="uber-select-item">
+    <FaClock />
+
+    <div className="date-time-controls">
+      <label htmlFor="searchFromTime">From</label>
+
+      <input
+        id="searchFromTime"
+        type="time"
+        value={searchFromTime}
+        onChange={(e) => setSearchFromTime(e.target.value)}
+      />
+    </div>
+  </div>
+
+  <div className="uber-select-item">
+    <FaClock />
+
+    <div className="date-time-controls">
+      <label htmlFor="searchToTime">Until</label>
+
+      <input
+        id="searchToTime"
+        type="time"
+        value={searchToTime}
+        onChange={(e) => setSearchToTime(e.target.value)}
+      />
+    </div>
+  </div>
+
+  <div className="uber-select-item">
+    <FaUser />
+
+    <select
+      name="seats"
+      value={filters.seats}
+      onChange={updateFilter}
+    >
+      <option value="1">For me (1)</option>
+      <option value="2">2 passengers</option>
+      <option value="3">3 passengers</option>
+      <option value="4">4 passengers</option>
+    </select>
+  </div>
+
+</div>
 
               <button type="submit" className="uber-search-button">Search</button>
             </form>
