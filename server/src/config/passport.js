@@ -2,7 +2,40 @@ const passport = require("passport");
 const { Strategy: LocalStrategy } = require("passport-local");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const bcrypt = require("bcrypt");
-const User = require("../models/User");
+const { getUserModel } = require("../models/User");
+const userStore = require("../utils/userStore");
+
+async function findUserByEmail(email) {
+  const User = getUserModel();
+  if (User) {
+    return User.findOne({ email: email.toLowerCase().trim() });
+  }
+  return userStore.findByEmail(email);
+}
+
+async function createUserRecord(payload) {
+  const User = getUserModel();
+  if (User) {
+    return User.create(payload);
+  }
+  return userStore.createUser(payload);
+}
+
+async function findUserById(id) {
+  const User = getUserModel();
+  if (User) {
+    return User.findById(id);
+  }
+  return userStore.findById(id);
+}
+
+async function findUserByPublicId(publicId) {
+  const User = getUserModel();
+  if (User) {
+    return User.findOne({ publicId });
+  }
+  return userStore.findByPublicId(publicId);
+}
 
 passport.use(
   new LocalStrategy(
@@ -13,7 +46,7 @@ passport.use(
     },
     async (email, password, done) => {
       try {
-        const user = await User.findOne({ email: email.toLowerCase().trim() });
+        const user = await findUserByEmail(email);
         if (!user || !user.passwordHash) {
           return done(null, false, { message: "Invalid email or password." });
         }
@@ -44,12 +77,13 @@ passport.use(
     async (_accessToken, _refreshToken, profile, done) => {
       try {
         const email = profile.emails?.[0]?.value?.toLowerCase().trim();
-        let user = await User.findOne({
-          $or: [{ googleId: profile.id }, ...(email ? [{ email }] : [])],
-        });
+        let user = await findUserByEmail(email || "");
+        if (!user && profile.id) {
+          user = await findUserById(profile.id);
+        }
 
         if (!user) {
-          user = await User.create({
+          user = await createUserRecord({
             name: profile.displayName || (email ? email.split("@")[0] : "Google User"),
             email: email || `${profile.id}@google.oauth.local`,
             googleId: profile.id,
@@ -78,7 +112,15 @@ passport.use(
           }
 
           if (changed) {
-            await user.save();
+            if (getUserModel()) {
+              await user.save();
+            } else {
+              await userStore.updateUser(user.publicId, {
+                googleId: user.googleId,
+                profilePictureUrl: user.profilePictureUrl,
+                profilePic: user.profilePic,
+              });
+            }
           }
         }
 
@@ -96,7 +138,7 @@ passport.serializeUser((user, done) => {
 
 passport.deserializeUser(async (id, done) => {
   try {
-    const user = await User.findById(id);
+    const user = await findUserById(id);
     done(null, user || false);
   } catch (error) {
     done(error);

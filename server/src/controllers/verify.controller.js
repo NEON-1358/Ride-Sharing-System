@@ -1,4 +1,5 @@
-const User = require("../models/User")
+const { getUserModel } = require("../models/User")
+const userStore = require("../utils/userStore")
 
 async function setField(userId, field) {
   const update = {}

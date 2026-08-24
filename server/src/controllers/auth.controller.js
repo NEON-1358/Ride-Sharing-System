@@ -1,9 +1,10 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const Joi = require("joi");
-const User = require("../models/User");
+const { getUserModel } = require("../models/User");
 const Review = require("../models/Review");
 const { toReview, toUserProfile } = require("../utils/serializers");
+const userStore = require("../utils/userStore");
 
 const secret = process.env.JWT_SECRET || "secretkey";
 
@@ -51,13 +52,17 @@ function authResponse(user) {
 }
 
 async function profilePayload(userId) {
-  const user = await User.findOne({ publicId: userId });
+  const User = getUserModel();
+  const user = User ? await User.findOne({ publicId: userId }) : await userStore.findByPublicId(userId);
   if (!user) return null;
 
-  const reviews = await Review.find({ reviewee: user._id })
-    .sort({ createdAt: -1 })
-    .limit(10)
-    .populate("reviewer");
+  let reviews = [];
+  if (User) {
+    reviews = await Review.find({ reviewee: user._id })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .populate("reviewer");
+  }
 
   return {
     user: toUserProfile(user),
@@ -74,18 +79,28 @@ exports.signup = async (req, res) => {
   }
 
   try {
-    const existing = await User.findOne({ email: value.email.toLowerCase().trim() });
+    const User = getUserModel();
+    const existing = User
+      ? await User.findOne({ email: value.email.toLowerCase().trim() })
+      : await userStore.findByEmail(value.email.toLowerCase().trim());
     if (existing) {
       return res.status(409).json({ message: "An account with that email already exists." });
     }
 
     const passwordHash = await bcrypt.hash(value.password, 10);
-    const user = await User.create({
-      name: value.name.trim(),
-      email: value.email.toLowerCase().trim(),
-      passwordHash,
-      profilePictureUrl: req.file ? req.file.path : "",
-    });
+    const user = User
+      ? await User.create({
+          name: value.name.trim(),
+          email: value.email.toLowerCase().trim(),
+          passwordHash,
+          profilePictureUrl: req.file ? req.file.path : "",
+        })
+      : await userStore.createUser({
+          name: value.name.trim(),
+          email: value.email.toLowerCase().trim(),
+          passwordHash,
+          profilePictureUrl: req.file ? req.file.path : "",
+        });
 
     return res.status(201).json(authResponse(user));
   } catch (_error) {
@@ -153,11 +168,14 @@ exports.updateProfile = async (req, res) => {
       update.profilePictureUrl = req.file.path || req.file.filename;
     }
 
-    const user = await User.findOneAndUpdate(
-      { publicId: req.user.publicId },
-      { $set: update },
-      { new: true }
-    );
+    const User = getUserModel();
+    const user = User
+      ? await User.findOneAndUpdate(
+          { publicId: req.user.publicId },
+          { $set: update },
+          { new: true }
+        )
+      : await userStore.updateUser(req.user.publicId, update);
 
     if (!user) {
       return res.status(404).json({ message: "User not found." });
@@ -173,7 +191,10 @@ exports.updateProfile = async (req, res) => {
 
 exports.deleteProfile = async (req, res) => {
   try {
-    const user = await User.findOneAndDelete({ publicId: req.user.publicId });
+    const User = getUserModel();
+    const user = User
+      ? await User.findOneAndDelete({ publicId: req.user.publicId })
+      : await userStore.deleteUser(req.user.publicId);
     
     if (!user) {
       return res.status(404).json({ message: "User not found." });

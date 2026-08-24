@@ -1,7 +1,8 @@
 const Joi = require("joi");
 const Booking = require("../models/Booking");
 const Ride = require("../models/Ride");
-const User = require("../models/User");
+const { getUserModel } = require("../models/User");
+const userStore = require("../utils/userStore");
 const { createNotification } = require("../utils/notifications");
 const { toRideCard } = require("../utils/serializers");
 

@@ -1,6 +1,8 @@
 const { mongoose } = require("../config/db");
 const { v4: uuidv4 } = require("uuid");
 
+const isMongoAvailable = () => Boolean(process.env.MONGO_URI);
+
 const UserSchema = new mongoose.Schema(
   {
     _id: {
@@ -100,4 +102,14 @@ const UserSchema = new mongoose.Schema(
 UserSchema.index({ email: 1 });
 UserSchema.index({ googleId: 1 });
 
-module.exports = mongoose.model("User", UserSchema);
+const UserModel = mongoose.models.User || mongoose.model("User", UserSchema);
+
+function getUserModel() {
+  if (isMongoAvailable()) {
+    return UserModel;
+  }
+
+  return null;
+}
+
+module.exports = { UserModel, getUserModel };

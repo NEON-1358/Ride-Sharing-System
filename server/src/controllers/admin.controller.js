@@ -1,6 +1,7 @@
 const Booking = require("../models/Booking");
 const Ride = require("../models/Ride");
-const User = require("../models/User");
+const { getUserModel } = require("../models/User");
+const userStore = require("../utils/userStore");
 const { toBooking, toRideCard, toUserProfile } = require("../utils/serializers");
 
 exports.getOverview = async (req, res) => {
