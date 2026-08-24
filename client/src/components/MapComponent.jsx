@@ -41,19 +41,25 @@ const carIcon = L.divIcon({
   iconAnchor: [16, 16]
 });
 
-function ChangeView({ center, zoom, markers, route }) {
+function ChangeView({ center, zoom, route, autoFit = true }) {
   const map = useMap();
+
   useEffect(() => {
+    if (!autoFit) {
+      return;
+    }
+
     if (route && route.length > 0) {
       const bounds = L.latLngBounds(route);
-      map.fitBounds(bounds, { padding: [50, 50] });
-    } else if (markers && markers.length > 0) {
-      const bounds = L.latLngBounds(markers.map(m => m.position));
-      map.fitBounds(bounds, { padding: [50, 50] });
+
+      map.fitBounds(bounds, {
+        padding: [50, 50],
+      });
     } else {
       map.setView(center, zoom);
     }
-  }, [center, zoom, map, markers, route]);
+  }, [center, zoom, route, map, autoFit]);
+
   return null;
 }
 
