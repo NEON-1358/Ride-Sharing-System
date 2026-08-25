@@ -14,6 +14,7 @@ export default function Dashboard() {
   const { showToast } = useToast();
   const [filters, setFilters] = useState(initialFilters);
   const [rides, setRides] = useState([]);
+  const [hasSearched, setHasSearched] = useState(false);
   const [searchDate, setSearchDate] = useState("");
   const [searchFromTime, setSearchFromTime] = useState("");
   const [searchToTime, setSearchToTime] = useState("");
@@ -296,15 +297,15 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
-    loadData();
-
-    // Live Tracking Sync for "In Progress" rides
-    const interval = setInterval(() => {
-      loadData(filters);
-    }, 15000); // Sync every 15 seconds
-
-    return () => clearInterval(interval);
-  }, [filters]);
+  // Do NOT load rides when the dashboard first opens.
+  // Rides should only appear after the user performs a search.
+  setRides([]);
+  setPagination({
+    page: 1,
+    totalPages: 1,
+    total: 0
+  });
+}, []);
 
   useEffect(() => {
     // Show rides on map
@@ -339,13 +340,13 @@ export default function Dashboard() {
   };
 }
 
-  async function submitFilters(event) {
+async function submitFilters(event) {
   event.preventDefault();
 
-  if (searchFromTime && searchToTime && searchFromTime > searchToTime) {   // checking time authentication
-  showToast("The 'Until' time must be after the 'From' time.", "error");
-  return;
-}
+  if (searchFromTime && searchToTime && searchFromTime > searchToTime) {
+    showToast("The 'Until' time must be after the 'From' time.", "error");
+    return;
+  }
 
   const { dateFrom, dateTo } = buildDateTimeRange();
 
@@ -355,21 +356,36 @@ export default function Dashboard() {
     dateTo,
     page: 1
   };
-    setFilters(nextFilters);
-    
-    // Update map markers based on source and destination
-    const [sourceCoords, destCoords] = await Promise.all([
-      nextFilters.source ? getCoordinates(nextFilters.source) : null,
-      nextFilters.destination ? getCoordinates(nextFilters.destination) : null
-    ]);
 
-    const newMarkers = [];
-    if (sourceCoords) newMarkers.push({ position: sourceCoords, popup: `Pickup: ${nextFilters.source}`, type: 'source' });
-    if (destCoords) newMarkers.push({ position: destCoords, popup: `Drop-off: ${nextFilters.destination}`, type: 'destination' });
-    setSearchMarkers(newMarkers);
+  setFilters(nextFilters);
 
-    await loadData(nextFilters);
+  const [sourceCoords, destCoords] = await Promise.all([
+    nextFilters.source ? getCoordinates(nextFilters.source) : null,
+    nextFilters.destination ? getCoordinates(nextFilters.destination) : null
+  ]);
+
+  const newMarkers = [];
+
+  if (sourceCoords) {
+    newMarkers.push({
+      position: sourceCoords,
+      popup: `Pickup: ${nextFilters.source}`,
+      type: 'source'
+    });
   }
+
+  if (destCoords) {
+    newMarkers.push({
+      position: destCoords,
+      popup: `Drop-off: ${nextFilters.destination}`,
+      type: 'destination'
+    });
+  }
+
+  setSearchMarkers(newMarkers);
+
+  await loadData(nextFilters);
+}
 
   
 

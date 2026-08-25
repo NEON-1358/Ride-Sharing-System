@@ -57,6 +57,10 @@ const RideSchema = new mongoose.Schema(
       type: { type: String, enum: ["Point"], default: "Point" },
       coordinates: { type: [Number], default: [0, 0] },
     },
+    routeCoordinates: {
+    type: [[Number]],
+    default: [],
+    },
     currentLocation: {
       type: { type: String, enum: ["Point"], default: "Point" },
       coordinates: { type: [Number], default: [0, 0] },

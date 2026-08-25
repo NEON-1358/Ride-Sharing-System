@@ -120,103 +120,359 @@ async function cancelRideAndBookings(ride, actor, cancelledReason = "") {
   ride.availableSeats = ride.totalSeats;
   await ride.save();
 }
+const EARTH_RADIUS_KM = 6371;
 
-exports.listRides = async (req, res) => {
-  const page = Math.max(1, Number(req.query.page || 1));
-  const limit = Math.min(12, Math.max(1, Number(req.query.limit || 6)));
-  const skip = (page - 1) * limit;
-  const query = {};
+function haversineDistanceKm(lat1, lon1, lat2, lon2) {
+  const toRad = (value) => (value * Math.PI) / 180;
 
-  if (req.query.status) {
-    query.status = req.query.status;
-  } else if (req.query.mine === "true") {
-    query.status = { $ne: "Cancelled" };
-  } else {
-    // For dashboard, only show bookable rides
-    query.status = "Open";
-  }
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
 
-  if (req.query.source) {
-    query.source = { $regex: req.query.source.trim(), $options: "i" };
-  }
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) ** 2;
 
-  if (req.query.destination) {
-    query.destination = { $regex: req.query.destination.trim(), $options: "i" };
-  }
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-if (req.query.dateFrom || req.query.dateTo) {
-  query.departureTime = {};
-
-  if (req.query.dateFrom) {
-    query.departureTime.$gte = new Date(req.query.dateFrom);
-  }
-
-  if (req.query.dateTo) {
-    query.departureTime.$lte = new Date(req.query.dateTo);
-  }
-} else {
-  // Never show rides that have already departed
-  query.departureTime = { $gte: new Date() };
+  return EARTH_RADIUS_KM * c;
 }
 
-  if (req.query.seats) {
-    query.availableSeats = { $gte: Number(req.query.seats) };
+function distanceFromRouteKm(point, routeCoordinates) {
+  if (!point || !routeCoordinates || routeCoordinates.length === 0) {
+    return Infinity;
   }
 
-  if (req.user) {
-    if (req.query.mine === "true") {
-      query.creator = req.user._id;
-    } else {
-      // For dashboard, don't show user's own rides since they can't book them
-      query.creator = { $ne: req.user._id };
+  const [pointLon, pointLat] = point;
+
+  let minimumDistance = Infinity;
+
+  for (const coordinate of routeCoordinates) {
+    const [routeLon, routeLat] = coordinate;
+
+    const distance = haversineDistanceKm(
+      pointLat,
+      pointLon,
+      routeLat,
+      routeLon
+    );
+
+    if (distance < minimumDistance) {
+      minimumDistance = distance;
     }
-  } else if (req.query.mine === "true") {
-    // If mine=true but no user, return empty results
+  }
+
+  return minimumDistance;
+}
+
+function isRideNearRequestedRoute(
+  ride,
+  pickupCoords,
+  dropoffCoords,
+  maxDistanceKm = 10
+) {
+  if (
+    !pickupCoords ||
+    !dropoffCoords ||
+    !ride.routeCoordinates ||
+    ride.routeCoordinates.length === 0
+  ) {
+    return false;
+  }
+
+  const pickupDistance = distanceFromRouteKm(
+    pickupCoords,
+    ride.routeCoordinates
+  );
+
+  const dropoffDistance = distanceFromRouteKm(
+    dropoffCoords,
+    ride.routeCoordinates
+  );
+
+  return (
+    pickupDistance <= maxDistanceKm &&
+    dropoffDistance <= maxDistanceKm
+  );
+}
+
+exports.listRides = async (req, res) => {
+  try {
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.min(12, Math.max(1, Number(req.query.limit || 6)));
+
+    const query = {};
+
+    // --------------------------------------------------
+    // 1. STATUS FILTER
+    // --------------------------------------------------
+
+    if (req.query.status) {
+      query.status = req.query.status;
+    } else if (req.query.mine === "true") {
+      query.status = { $ne: "Cancelled" };
+    } else {
+      // Normal dashboard search:
+      // only show rides that can actually be booked.
+      query.status = "Open";
+    }
+
+    // --------------------------------------------------
+    // 2. DATE / TIME FILTER
+    // --------------------------------------------------
+
+    if (req.query.dateFrom || req.query.dateTo) {
+      query.departureTime = {};
+
+      if (req.query.dateFrom) {
+        query.departureTime.$gte = new Date(req.query.dateFrom);
+      }
+
+      if (req.query.dateTo) {
+        query.departureTime.$lte = new Date(req.query.dateTo);
+      }
+    } else {
+      // If the user didn't specify a date,
+      // don't show rides that already departed.
+      query.departureTime = {
+        $gte: new Date()
+      };
+    }
+
+    // --------------------------------------------------
+    // 3. SEAT FILTER
+    // --------------------------------------------------
+
+    if (req.query.seats) {
+      query.availableSeats = {
+        $gte: Number(req.query.seats)
+      };
+    }
+
+    // --------------------------------------------------
+    // 4. USER FILTER
+    // --------------------------------------------------
+
+    if (req.user) {
+      if (req.query.mine === "true") {
+        query.creator = req.user._id;
+      } else {
+        // Don't show the user's own ride as a bookable ride.
+        query.creator = {
+          $ne: req.user._id
+        };
+      }
+    } else if (req.query.mine === "true") {
+      return res.json({
+        items: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 1
+        }
+      });
+    }
+
+    // --------------------------------------------------
+    // 5. CHECK WHETHER THIS IS A LOCATION SEARCH
+    // --------------------------------------------------
+
+    const pickupLat = Number(req.query.pickupLat);
+    const pickupLon = Number(req.query.pickupLon);
+
+    const dropoffLat = Number(req.query.dropoffLat);
+    const dropoffLon = Number(req.query.dropoffLon);
+
+    const hasLocationSearch =
+      Number.isFinite(pickupLat) &&
+      Number.isFinite(pickupLon) &&
+      Number.isFinite(dropoffLat) &&
+      Number.isFinite(dropoffLon);
+
+    // --------------------------------------------------
+    // 6. TEXT SEARCH FALLBACK
+    // --------------------------------------------------
+    //
+    // If coordinates are NOT provided, use the old
+    // source/destination text search.
+    //
+    // If coordinates ARE provided, we DON'T use
+    // exact source/destination matching.
+    //
+    // This is important because:
+    //
+    // Passenger:
+    // Chitkara University -> Ambala
+    //
+    // Driver:
+    // Rajpura -> Yamunanagar
+    //
+    // These strings don't match exactly,
+    // but their routes may overlap.
+    // --------------------------------------------------
+
+    if (!hasLocationSearch) {
+      if (req.query.source) {
+        query.source = {
+          $regex: req.query.source.trim(),
+          $options: "i"
+        };
+      }
+
+      if (req.query.destination) {
+        query.destination = {
+          $regex: req.query.destination.trim(),
+          $options: "i"
+        };
+      }
+    }
+
+    // --------------------------------------------------
+    // 7. FETCH CANDIDATE RIDES
+    // --------------------------------------------------
+
+    const rides = await Ride.find(query)
+      .populate("creator")
+      .sort({
+        departureTime: 1,
+        createdAt: -1
+      });
+
+    // --------------------------------------------------
+    // 8. ROUTE MATCHING
+    // --------------------------------------------------
+
+    let matchedRides = rides;
+
+    if (hasLocationSearch) {
+      const pickupCoords = [
+        pickupLon,
+        pickupLat
+      ];
+
+      const dropoffCoords = [
+        dropoffLon,
+        dropoffLat
+      ];
+
+      matchedRides = rides.filter((ride) => {
+        const matched = isRideNearRequestedRoute(
+          ride,
+          pickupCoords,
+          dropoffCoords
+        );
+
+        if (matched) {
+          console.log(
+            `MATCHED RIDE: ${ride.source} -> ${ride.destination}`
+          );
+        }
+
+        return matched;
+      });
+    }
+
+    // --------------------------------------------------
+    // 9. PAGINATION AFTER MATCHING
+    // --------------------------------------------------
+    //
+    // This is important.
+    //
+    // We DON'T paginate before route matching.
+    //
+    // Otherwise:
+    //
+    // Page 1 might contain 6 unrelated rides,
+    // while the actual matching ride is on page 2.
+    //
+    // So we match first, then paginate.
+    // --------------------------------------------------
+
+    const total = matchedRides.length;
+
+    const skip = (page - 1) * limit;
+
+    const paginatedRides = matchedRides.slice(
+      skip,
+      skip + limit
+    );
+
+    // --------------------------------------------------
+    // 10. LOAD BOOKINGS
+    // --------------------------------------------------
+
+    const rideIds = paginatedRides.map(
+      (ride) => ride._id
+    );
+
+    const bookingDocs = await Booking.find({
+      ride: {
+        $in: rideIds
+      },
+      status: {
+        $in: [
+          "Pending",
+          "Accepted",
+          "Completed"
+        ]
+      }
+    }).populate("user");
+
+    const bookingMap = bookingDocs.reduce(
+      (map, booking) => {
+        const key = String(booking.ride);
+
+        if (!map.has(key)) {
+          map.set(key, []);
+        }
+
+        map.get(key).push(booking);
+
+        return map;
+      },
+      new Map()
+    );
+
+    // --------------------------------------------------
+    // 11. RETURN RESPONSE
+    // --------------------------------------------------
+
     return res.json({
-      items: [],
-      pagination: { page, limit, total: 0, totalPages: 1 },
+      items: paginatedRides.map((ride) =>
+        toRideCard(
+          {
+            ...ride.toObject(),
+            passengers:
+              bookingMap.get(String(ride._id)) || []
+          },
+          req.user
+        )
+      ),
+
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(
+          1,
+          Math.ceil(total / limit)
+        )
+      }
+    });
+
+  } catch (error) {
+    console.error(
+      "Error while searching rides:",
+      error
+    );
+
+    return res.status(500).json({
+      message: "Failed to search rides.",
+      error: error.message
     });
   }
-
-  const [total, rides] = await Promise.all([
-    Ride.countDocuments(query),
-    Ride.find(query)
-      .populate("creator")
-      .sort({ departureTime: 1, createdAt: -1 })
-      .skip(skip)
-      .limit(limit),
-  ]);
-
-  const rideIds = rides.map((ride) => ride._id);
-  const bookingDocs = await Booking.find({
-    ride: { $in: rideIds },
-    status: { $in: ["Pending", "Accepted", "Completed"] },
-  }).populate("user");
-
-  const bookingMap = bookingDocs.reduce((map, booking) => {
-    const key = String(booking.ride);
-    if (!map.has(key)) map.set(key, []);
-    map.get(key).push(booking);
-    return map;
-  }, new Map());
-
-  return res.json({
-    items: rides.map((ride) =>
-      toRideCard(
-        {
-          ...ride.toObject(),
-          passengers: bookingMap.get(String(ride._id)) || [],
-        },
-        req.user
-      )
-    ),
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.max(1, Math.ceil(total / limit)),
-    },
-  });
 };
 
 exports.getRide = async (req, res) => {
@@ -258,6 +514,39 @@ async function verifyLocation(name) {
     return true; // Fallback to true if API is down to avoid blocking users
   }
 }
+async function getRouteCoordinates(sourceCoords, destinationCoords) {
+  if (!sourceCoords || !destinationCoords) {
+    return [];
+  }
+
+  try {
+    const [sourceLon, sourceLat] = sourceCoords;
+    const [destLon, destLat] = destinationCoords;
+
+    const url =
+      `https://router.project-osrm.org/route/v1/driving/` +
+      `${sourceLon},${sourceLat};${destLon},${destLat}` +
+      `?overview=full&geometries=geojson`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      console.error("OSRM routing failed");
+      return [];
+    }
+
+    const data = await response.json();
+
+    if (!data.routes || data.routes.length === 0) {
+      return [];
+    }
+
+    return data.routes[0].geometry.coordinates;
+  } catch (error) {
+    console.error("Error getting route:", error);
+    return [];
+  }
+}
 
 exports.createRide = async (req, res, next) => {
   try {
@@ -279,14 +568,41 @@ exports.createRide = async (req, res, next) => {
       return res.status(400).json({ message: `The location '${value.destination}' could not be verified on the map. Please use a real address.` });
     }
 
-    const ride = await Ride.create({
-      ...value,
-      availableSeats: value.totalSeats,
-      creator: req.user._id,
-      sourceCoords: value.sourceCoords ? { type: "Point", coordinates: value.sourceCoords } : undefined,
-      destinationCoords: value.destinationCoords ? { type: "Point", coordinates: value.destinationCoords } : undefined,
-      currentLocation: value.sourceCoords ? { type: "Point", coordinates: value.sourceCoords } : undefined,
-    });
+    const routeCoordinates = await getRouteCoordinates(
+  value.sourceCoords,
+  value.destinationCoords
+);
+
+const ride = await Ride.create({
+  ...value,
+
+  availableSeats: value.totalSeats,
+
+  creator: req.user._id,
+
+  sourceCoords: value.sourceCoords
+    ? {
+        type: "Point",
+        coordinates: value.sourceCoords
+      }
+    : undefined,
+
+  destinationCoords: value.destinationCoords
+    ? {
+        type: "Point",
+        coordinates: value.destinationCoords
+      }
+    : undefined,
+
+  routeCoordinates,
+
+  currentLocation: value.sourceCoords
+    ? {
+        type: "Point",
+        coordinates: value.sourceCoords
+      }
+    : undefined,
+});
 
     const populatedRide = await loadRideForOutput(ride._id, req.user.publicId);
     return res.status(201).json(populatedRide);
